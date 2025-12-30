@@ -219,10 +219,46 @@ xianyu_answer/
 
 ## 部署信息
 
-- **服务器**：腾讯云轻量服务器 111.231.107.149
-- **系统**：OpenCloudOS 9 + 宝塔面板
-- **域名**：xianyu.wyqaii.top（阿里云DNS）
-- **部署方式**：Nginx 静态文件 + Python项目管理器
+### 服务器配置
+
+| 项目 | 值 |
+|------|-----|
+| 云服务商 | 腾讯云轻量应用服务器 |
+| 服务器 IP | 111.231.107.149 |
+| 操作系统 | OpenCloudOS 9 |
+| 管理面板 | 宝塔 Linux 面板 |
+| 域名 | xianyu.wyqaii.top（阿里云DNS） |
+| 项目目录 | /www/wwwroot/xianyu_answer |
+| Python 环境 | /root/miniconda3/envs/xianyu |
+
+### 部署方式
+
+- **备案前**：通过 IP 访问 `http://111.231.107.149`
+- **备案后**：通过域名访问 `https://xianyu.wyqaii.top`
+
+### 服务器项目更新
+
+```bash
+# SSH 登录
+ssh root@111.231.107.149
+
+# 进入项目目录
+cd /www/wwwroot/xianyu_answer
+
+# 一键更新（如已创建脚本）
+./update.sh
+
+# 或手动更新
+git pull origin main
+cd backend && /root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
+cd ../frontend && npm install && npm run build
+
+# 宝塔面板重启 Python 项目
+```
+
+### 详细文档
+
+完整部署指南请参考 [Prd.md 第八章](./Prd.md#八部署方案)
 
 ## 版本历史
 

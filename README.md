@@ -166,7 +166,60 @@ xianyu_answer/
 
 ## 部署
 
-详见 [Prd.md](./Prd.md) 第八章 部署方案
+### 服务器信息
+
+| 项目 | 值 |
+|------|-----|
+| 服务器 | 腾讯云轻量应用服务器 |
+| IP | 111.231.107.149 |
+| 系统 | OpenCloudOS 9 + 宝塔面板 |
+| 域名 | xianyu.wyqaii.top |
+
+### 快速部署
+
+```bash
+# 1. SSH 登录服务器
+ssh root@111.231.107.149
+
+# 2. 克隆代码
+mkdir -p /www/wwwroot/xianyu_answer
+cd /www/wwwroot/xianyu_answer
+git clone https://github.com/Wuaqi/xianyu_answer.git .
+
+# 3. 安装后端依赖
+cd backend
+/root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
+
+# 4. 构建前端
+cd ../frontend
+npm install && npm run build
+```
+
+然后在宝塔面板配置：
+1. 添加网站，根目录指向 `frontend/dist`
+2. Python项目管理器添加 FastAPI 项目
+3. 配置 Nginx 反向代理 `/api/` → `127.0.0.1:8000`
+
+### 项目更新
+
+```bash
+cd /www/wwwroot/xianyu_answer
+git pull origin main
+cd backend && /root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
+cd ../frontend && npm install && npm run build
+# 宝塔面板重启 Python 项目
+```
+
+### 详细文档
+
+完整部署指南请参考 [Prd.md 第八章](./Prd.md#八部署方案)，包含：
+
+- 8.3 IP 部署（备案审核期间）
+- 8.4 域名部署（备案通过后）
+- 8.5 从 IP 迁移到域名
+- 8.6 项目更新流程
+- 8.7 常见问题排查
+- 8.8 SSL 证书说明
 
 ## License
 

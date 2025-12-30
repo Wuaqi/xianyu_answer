@@ -486,43 +486,391 @@ xianyu_answer/
 
 ## 八、部署方案
 
-### 8.1 部署架构
+### 8.1 服务器信息
+
+| 项目 | 值 |
+|------|-----|
+| 云服务商 | 腾讯云轻量应用服务器 |
+| 服务器 IP | 111.231.107.149 |
+| 操作系统 | OpenCloudOS 9 |
+| 管理面板 | 宝塔 Linux 面板 |
+| 域名 | wyqaii.top（主域名）|
+| 子域名 | xianyu.wyqaii.top（本项目）|
+| DNS 服务商 | 阿里云 |
+
+### 8.2 部署架构
 
 ```
-用户手机/电脑浏览器
-        │
-        ▼
-┌─────────────────┐
-│  xianyu.wyqaii.top  │  (子域名，阿里云DNS解析)
-└─────────────────┘
-        │
-        ▼
+用户浏览器
+    │
+    ▼
+┌─────────────────────────────────────┐
+│  访问地址                            │
+│  备案前: http://111.231.107.149     │
+│  备案后: https://xianyu.wyqaii.top  │
+└─────────────────────────────────────┘
+    │
+    ▼
 ┌─────────────────────────────────────┐
 │  腾讯云轻量服务器                    │
 │  111.231.107.149                    │
 │  OpenCloudOS 9 + 宝塔面板           │
 │                                     │
 │  ┌─────────────────────────────┐   │
-│  │  Nginx (反向代理 + 静态文件) │   │
-│  │  - 静态文件: React打包产物   │   │
-│  │  - 代理: /api/* → FastAPI   │   │
+│  │  Nginx (端口 80/443)         │   │
+│  │  ├─ /        → 前端静态文件  │   │
+│  │  └─ /api/*   → FastAPI:8000 │   │
 │  └─────────────────────────────┘   │
 │              │                      │
 │              ▼                      │
 │  ┌─────────────────────────────┐   │
 │  │  FastAPI (Python项目管理器)  │   │
 │  │  端口: 8000                  │   │
+│  │  环境: conda xianyu          │   │
+│  └─────────────────────────────┘   │
+│              │                      │
+│              ▼                      │
+│  ┌─────────────────────────────┐   │
+│  │  SQLite 数据库               │   │
+│  │  backend/data/xianyu.db     │   │
 │  └─────────────────────────────┘   │
 └─────────────────────────────────────┘
 ```
 
-### 8.2 部署步骤概要
+### 8.3 部署方式一：IP 部署（备案审核期间）
 
-1. **DNS配置**：阿里云添加A记录 `xianyu` → `111.231.107.149`
-2. **前端打包**：`npm run build` 生成静态文件
-3. **后端部署**：宝塔Python项目管理器配置FastAPI
-4. **Nginx配置**：静态文件 + API反向代理
-5. **SSL证书**：宝塔一键申请Let's Encrypt
+> 适用于域名备案审核中，只能通过 IP 访问服务器的情况。
+
+#### 8.3.1 服务器环境准备
+
+```bash
+# 1. SSH 登录服务器
+ssh root@111.231.107.149
+
+# 2. 安装 Miniconda（如果没有）
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh -b -p /root/miniconda3
+echo 'export PATH="/root/miniconda3/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# 3. 创建 Python 环境
+conda create -n xianyu python=3.11 -y
+conda activate xianyu
+
+# 4. 安装 Node.js（通过宝塔面板）
+# 宝塔面板 → 软件商店 → 搜索 "Node.js版本管理器" → 安装
+# 安装完成后选择 Node.js 18.x 或 22.x 版本
+```
+
+#### 8.3.2 部署项目代码
+
+```bash
+# 1. 创建项目目录
+mkdir -p /www/wwwroot/xianyu_answer
+cd /www/wwwroot/xianyu_answer
+
+# 2. 克隆代码（使用 HTTPS，无需 SSH 密钥）
+git clone https://github.com/Wuaqi/xianyu_answer.git .
+
+# 3. 安装后端依赖
+cd backend
+/root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
+
+# 4. 构建前端
+cd ../frontend
+npm install
+npm run build
+```
+
+#### 8.3.3 宝塔面板配置
+
+**步骤 1：添加网站**
+
+1. 宝塔面板 → **网站** → **添加站点**
+2. 配置项：
+   - 域名：`111.231.107.149`
+   - 根目录：`/www/wwwroot/xianyu_answer/frontend/dist`
+   - PHP版本：**纯静态**
+   - 数据库：不创建
+
+**步骤 2：配置 Python 项目**
+
+1. 宝塔面板 → **软件商店** → 搜索 **Python项目管理器** → 安装
+2. 打开 **Python项目管理器** → **添加项目**
+3. 配置项：
+
+| 配置项 | 值 |
+|--------|-----|
+| 项目名称 | xianyu_answer |
+| 项目路径 | /www/wwwroot/xianyu_answer/backend |
+| Python版本 | /root/miniconda3/envs/xianyu/bin/python |
+| 框架 | FastAPI |
+| 启动文件 | run.py |
+| 端口 | 8000 |
+| 开机启动 | ✅ 勾选 |
+
+**步骤 3：配置 Nginx**
+
+1. 宝塔面板 → **网站** → 点击 `111.231.107.149` → **设置**
+2. 点击左侧 **配置文件**
+3. 替换为以下内容：
+
+```nginx
+server {
+    listen 80;
+    server_name 111.231.107.149;
+
+    # 前端静态文件目录
+    root /www/wwwroot/xianyu_answer/frontend/dist;
+    index index.html;
+
+    # API 反向代理到 FastAPI
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 120s;  # LLM 请求可能较慢
+        proxy_send_timeout 60s;
+    }
+
+    # 前端 SPA 路由支持
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 日志
+    access_log /www/wwwlogs/xianyu_answer.log;
+    error_log /www/wwwlogs/xianyu_answer.error.log;
+}
+```
+
+4. 点击 **保存** → 重载 Nginx
+
+**步骤 4：验证部署**
+
+1. 浏览器访问：`http://111.231.107.149`
+2. 检查页面是否正常加载
+3. 点击设置，配置大模型 API
+4. 测试消息分析功能
+
+### 8.4 部署方式二：域名部署（备案通过后）
+
+> 适用于域名备案已通过，可以正常使用域名访问的情况。
+
+#### 8.4.1 DNS 配置
+
+在阿里云 DNS 控制台添加解析记录：
+
+| 记录类型 | 主机记录 | 记录值 | TTL |
+|----------|----------|--------|-----|
+| A | xianyu | 111.231.107.149 | 10分钟 |
+
+等待 DNS 生效（通常 1-10 分钟）。
+
+#### 8.4.2 项目部署
+
+与 IP 部署相同，参考 8.3.2 和 8.3.3 步骤，但需修改：
+
+**添加网站时**：域名填写 `xianyu.wyqaii.top`
+
+**Nginx 配置**：
+
+```nginx
+server {
+    listen 80;
+    server_name xianyu.wyqaii.top;
+
+    root /www/wwwroot/xianyu_answer/frontend/dist;
+    index index.html;
+
+    location /api/ {
+        proxy_pass http://127.0.0.1:8000/api/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 60s;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    access_log /www/wwwlogs/xianyu.wyqaii.top.log;
+    error_log /www/wwwlogs/xianyu.wyqaii.top.error.log;
+}
+```
+
+#### 8.4.3 配置 SSL 证书（免费）
+
+1. 宝塔面板 → **网站** → 点击 `xianyu.wyqaii.top` → **设置**
+2. 点击左侧 **SSL**
+3. 选择 **Let's Encrypt**（免费）
+4. 勾选域名 `xianyu.wyqaii.top`
+5. 点击 **申请**
+6. 申请成功后，开启 **强制HTTPS**
+
+> **注意**：SSL 证书需要域名，纯 IP 无法申请 SSL 证书。
+
+### 8.5 从 IP 部署迁移到域名部署
+
+当域名备案通过后，按以下步骤迁移：
+
+#### 步骤 1：添加 DNS 解析
+
+在阿里云添加 A 记录：`xianyu` → `111.231.107.149`
+
+#### 步骤 2：修改宝塔网站配置
+
+1. 宝塔面板 → **网站** → 点击 `111.231.107.149` → **设置**
+2. 点击左侧 **域名管理**
+3. 添加域名：`xianyu.wyqaii.top`
+4. 删除域名：`111.231.107.149`（可选，保留也可以）
+
+#### 步骤 3：更新 Nginx 配置
+
+修改 `server_name`：
+
+```nginx
+server {
+    listen 80;
+    server_name xianyu.wyqaii.top;  # 改成域名
+    # ... 其他配置保持不变
+}
+```
+
+#### 步骤 4：申请 SSL 证书
+
+参考 8.4.3 配置免费的 Let's Encrypt 证书。
+
+#### 步骤 5：验证
+
+1. 访问 `https://xianyu.wyqaii.top`
+2. 确认 HTTPS 正常工作
+3. 测试所有功能
+
+### 8.6 项目更新流程
+
+当本地开发完成新功能并推送到 GitHub 后，在服务器执行以下步骤更新：
+
+#### 8.6.1 手动更新
+
+```bash
+# SSH 登录服务器
+ssh root@111.231.107.149
+
+# 进入项目目录
+cd /www/wwwroot/xianyu_answer
+
+# 1. 拉取最新代码
+git pull origin main
+
+# 2. 更新后端依赖（如有新增）
+cd backend
+/root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
+
+# 3. 重新构建前端（如有改动）
+cd ../frontend
+npm install
+npm run build
+
+# 4. 重启后端服务
+# 方式一：宝塔面板 → Python项目管理器 → 找到项目 → 点击「重启」
+# 方式二：命令行（如果知道进程管理方式）
+```
+
+#### 8.6.2 一键更新脚本
+
+在服务器创建更新脚本，简化更新流程：
+
+```bash
+# 创建脚本
+cat > /www/wwwroot/xianyu_answer/update.sh << 'EOF'
+#!/bin/bash
+set -e
+
+PROJECT_DIR="/www/wwwroot/xianyu_answer"
+PYTHON="/root/miniconda3/envs/xianyu/bin/python"
+PIP="/root/miniconda3/envs/xianyu/bin/pip"
+
+cd $PROJECT_DIR
+
+echo "=========================================="
+echo "  闲鱼代写助手 - 项目更新脚本"
+echo "=========================================="
+
+echo ""
+echo "[1/4] 拉取最新代码..."
+git pull origin main
+
+echo ""
+echo "[2/4] 更新后端依赖..."
+cd backend
+$PIP install -r requirements.txt --quiet
+
+echo ""
+echo "[3/4] 构建前端..."
+cd ../frontend
+npm install --silent
+npm run build
+
+echo ""
+echo "[4/4] 更新完成！"
+echo ""
+echo ">>> 请在宝塔面板重启 Python 项目 <<<"
+echo ""
+EOF
+
+# 添加执行权限
+chmod +x /www/wwwroot/xianyu_answer/update.sh
+```
+
+以后更新只需执行：
+
+```bash
+cd /www/wwwroot/xianyu_answer
+./update.sh
+# 然后去宝塔面板重启 Python 项目
+```
+
+### 8.7 常见问题排查
+
+| 问题 | 可能原因 | 解决方法 |
+|------|----------|----------|
+| 页面白屏/404 | Nginx 根目录配置错误 | 检查 root 是否指向 `frontend/dist` |
+| API 返回 404 | Python 项目未启动 | 宝塔面板检查 Python 项目状态 |
+| API 返回 502 | FastAPI 崩溃 | 查看 Python 项目日志，重启服务 |
+| API 请求超时 | LLM API 响应慢 | 增加 `proxy_read_timeout` 值 |
+| 前端路由 404 | Nginx 未配置 SPA 支持 | 添加 `try_files $uri $uri/ /index.html` |
+| SSL 证书申请失败 | 域名未解析/备案未通过 | 确认 DNS 生效且备案已完成 |
+
+**查看日志命令：**
+
+```bash
+# Nginx 访问日志
+tail -f /www/wwwlogs/xianyu_answer.log
+
+# Nginx 错误日志
+tail -f /www/wwwlogs/xianyu_answer.error.log
+
+# Python 项目日志
+# 宝塔面板 → Python项目管理器 → 点击项目 → 日志
+```
+
+### 8.8 SSL 证书说明
+
+| 证书类型 | 价格 | 有效期 | 说明 |
+|----------|------|--------|------|
+| Let's Encrypt | 免费 | 90天（自动续期） | 推荐，宝塔面板内置支持 |
+| 阿里云免费证书 | 免费 | 1年 | 需手动申请和部署 |
+| 商业证书 | 付费 | 1-2年 | 企业级，有保险赔付 |
+
+> **推荐**：使用 Let's Encrypt 免费证书，宝塔面板会自动续期，无需手动操作。
 
 ---
 

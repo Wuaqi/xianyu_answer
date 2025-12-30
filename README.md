@@ -173,7 +173,13 @@ xianyu_answer/
 | 服务器 | 腾讯云轻量应用服务器 |
 | IP | 111.231.107.149 |
 | 系统 | OpenCloudOS 9 + 宝塔面板 |
-| 域名 | xianyu.wyqaii.top |
+| 已有站点 | wyqaii.top（默认站点） |
+| 本项目域名 | xianyu.wyqaii.top |
+
+### 访问地址
+
+- **备案前**：`http://111.231.107.149:8080`（使用端口避免冲突）
+- **备案后**：`https://xianyu.wyqaii.top`
 
 ### 快速部署
 
@@ -181,24 +187,31 @@ xianyu_answer/
 # 1. SSH 登录服务器
 ssh root@111.231.107.149
 
-# 2. 克隆代码
+# 2. 安装 Miniconda 并创建环境
+wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+bash Miniconda3-latest-Linux-x86_64.sh -b -p /root/miniconda3
+source ~/.bashrc
+conda create -n xianyu python=3.11 -y
+
+# 3. 克隆代码
 mkdir -p /www/wwwroot/xianyu_answer
 cd /www/wwwroot/xianyu_answer
 git clone https://github.com/Wuaqi/xianyu_answer.git .
 
-# 3. 安装后端依赖
+# 4. 安装后端依赖
 cd backend
 /root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
 
-# 4. 构建前端
+# 5. 构建前端（Node.js 已安装）
 cd ../frontend
 npm install && npm run build
 ```
 
 然后在宝塔面板配置：
-1. 添加网站，根目录指向 `frontend/dist`
-2. Python项目管理器添加 FastAPI 项目
-3. 配置 Nginx 反向代理 `/api/` → `127.0.0.1:8000`
+1. 添加网站：`111.231.107.149:8080`，根目录 `frontend/dist`
+2. Python项目管理器添加 FastAPI 项目（端口 8000）
+3. 配置 Nginx（监听 8080，反向代理 /api/）
+4. 开放防火墙 8080 端口（宝塔 + 腾讯云）
 
 ### 项目更新
 
@@ -214,9 +227,9 @@ cd ../frontend && npm install && npm run build
 
 完整部署指南请参考 [Prd.md 第八章](./Prd.md#八部署方案)，包含：
 
-- 8.3 IP 部署（备案审核期间）
+- 8.3 IP + 端口部署（备案审核期间）
 - 8.4 域名部署（备案通过后）
-- 8.5 从 IP 迁移到域名
+- 8.5 从 8080 端口迁移到域名
 - 8.6 项目更新流程
 - 8.7 常见问题排查
 - 8.8 SSL 证书说明

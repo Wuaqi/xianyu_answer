@@ -227,14 +227,15 @@ xianyu_answer/
 | 服务器 IP | 111.231.107.149 |
 | 操作系统 | OpenCloudOS 9 |
 | 管理面板 | 宝塔 Linux 面板 |
-| 域名 | xianyu.wyqaii.top（阿里云DNS） |
+| 已有站点 | wyqaii.top（默认站点，端口 80） |
+| 本项目域名 | xianyu.wyqaii.top |
 | 项目目录 | /www/wwwroot/xianyu_answer |
 | Python 环境 | /root/miniconda3/envs/xianyu |
 
-### 部署方式
+### 访问地址
 
-- **备案前**：通过 IP 访问 `http://111.231.107.149`
-- **备案后**：通过域名访问 `https://xianyu.wyqaii.top`
+- **备案前**：`http://111.231.107.149:8080`（使用 8080 端口避免与默认站点冲突）
+- **备案后**：`https://xianyu.wyqaii.top`
 
 ### 服务器项目更新
 

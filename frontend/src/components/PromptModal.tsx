@@ -1,15 +1,46 @@
 import { useState, useEffect } from 'react';
 import type { PromptTemplates } from '../types';
 import { getPrompts, updatePrompts } from '../services/api';
+import { getRetentionTemplate, updateRetentionTemplate } from '../services/sessionApi';
 
 interface PromptModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+type PromptTab = 'analyze' | 'system' | 'analyze_v3' | 'retention';
+
+const TAB_CONFIG: { key: PromptTab; label: string; description: string }[] = [
+  {
+    key: 'analyze',
+    label: '快速分析',
+    description: '可用变量：{message}（买家消息）、{service_list}（服务列表）、{service_count}（服务数量）',
+  },
+  {
+    key: 'system',
+    label: '系统提示词',
+    description: '系统提示词用于设定 AI 的角色和行为规则',
+  },
+  {
+    key: 'analyze_v3',
+    label: '对话分析',
+    description: '对话助手的分析提示词，可用变量：{conversation_history}（对话历史）、{accumulated_info}（已提取信息）、{service_list}（服务列表）',
+  },
+  {
+    key: 'retention',
+    label: '挽留话术',
+    description: '当会话未成交时，用于挽留客户的话术模板',
+  },
+];
+
 export function PromptModal({ isOpen, onClose }: PromptModalProps) {
-  const [prompts, setPrompts] = useState<PromptTemplates>({ analyze: '', system: '' });
-  const [activeTab, setActiveTab] = useState<'analyze' | 'system'>('analyze');
+  const [prompts, setPrompts] = useState<PromptTemplates & { retention: string }>({
+    analyze: '',
+    system: '',
+    analyze_v3: '',
+    retention: '',
+  });
+  const [activeTab, setActiveTab] = useState<PromptTab>('analyze');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -18,8 +49,18 @@ export function PromptModal({ isOpen, onClose }: PromptModalProps) {
     if (isOpen) {
       setLoading(true);
       setMessage(null);
-      getPrompts()
-        .then(setPrompts)
+
+      // 并行加载提示词和挽留话术
+      Promise.all([
+        getPrompts(),
+        getRetentionTemplate().catch(() => ({ content: '亲，看到您还没有下单，是有什么顾虑吗？我们可以再聊聊~' })),
+      ])
+        .then(([promptsData, retentionData]) => {
+          setPrompts({
+            ...promptsData,
+            retention: retentionData.content,
+          });
+        })
         .catch((err) => setMessage({ type: 'error', text: err.message }))
         .finally(() => setLoading(false));
     }
@@ -31,7 +72,16 @@ export function PromptModal({ isOpen, onClose }: PromptModalProps) {
     setSaving(true);
     setMessage(null);
     try {
-      await updatePrompts(prompts);
+      // 保存提示词
+      await updatePrompts({
+        analyze: prompts.analyze,
+        system: prompts.system,
+        analyze_v3: prompts.analyze_v3,
+      });
+
+      // 保存挽留话术
+      await updateRetentionTemplate({ content: prompts.retention });
+
       setMessage({ type: 'success', text: '保存成功' });
     } catch (err) {
       setMessage({ type: 'error', text: err instanceof Error ? err.message : '保存失败' });
@@ -65,26 +115,19 @@ export function PromptModal({ isOpen, onClose }: PromptModalProps) {
 
         {/* Tabs */}
         <div className="flex border-b">
-          <button
-            onClick={() => setActiveTab('analyze')}
-            className={`px-4 py-2 text-sm font-medium ${
-              activeTab === 'analyze'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            分析提示词
-          </button>
-          <button
-            onClick={() => setActiveTab('system')}
-            className={`px-4 py-2 text-sm font-medium ${
-              activeTab === 'system'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-          >
-            系统提示词
-          </button>
+          {TAB_CONFIG.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2 text-sm font-medium ${
+                activeTab === tab.key
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Content */}
@@ -96,21 +139,13 @@ export function PromptModal({ isOpen, onClose }: PromptModalProps) {
           ) : (
             <>
               <div className="mb-2 text-sm text-gray-600">
-                {activeTab === 'analyze' ? (
-                  <span>
-                    可用变量：<code className="bg-gray-100 px-1 rounded">{'{message}'}</code>（买家消息）、
-                    <code className="bg-gray-100 px-1 rounded">{'{service_list}'}</code>（服务列表）、
-                    <code className="bg-gray-100 px-1 rounded">{'{service_count}'}</code>（服务数量）
-                  </span>
-                ) : (
-                  <span>系统提示词用于设定 AI 的角色和行为规则</span>
-                )}
+                <span>{TAB_CONFIG.find((t) => t.key === activeTab)?.description}</span>
               </div>
               <textarea
                 value={prompts[activeTab]}
                 onChange={(e) => handleChange(e.target.value)}
                 className="flex-1 w-full p-3 border border-gray-300 rounded-lg font-mono text-sm resize-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder={activeTab === 'analyze' ? '输入分析提示词模板...' : '输入系统提示词...'}
+                placeholder={`输入${TAB_CONFIG.find((t) => t.key === activeTab)?.label}提示词...`}
               />
             </>
           )}

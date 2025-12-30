@@ -106,3 +106,97 @@ def init_db() -> None:
                 "INSERT INTO reply_templates (title, content, sort_order) VALUES (?, ?, ?)",
                 default_templates
             )
+
+        # ========== V3 新增表 ==========
+
+        # 会话表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                status TEXT DEFAULT 'active',
+                deal_status TEXT DEFAULT 'pending',
+                deal_price INTEGER,
+                article_type TEXT,
+                requirement_summary TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sessions_status
+            ON sessions(status)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sessions_deal_status
+            ON sessions(deal_status)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_sessions_created_at
+            ON sessions(created_at DESC)
+        """)
+
+        # 消息表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_messages_session_id
+            ON messages(session_id)
+        """)
+
+        # AI 分析结果表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS ai_analyses (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER NOT NULL,
+                message_id INTEGER NOT NULL,
+                suggested_replies TEXT NOT NULL,
+                extracted_info TEXT NOT NULL,
+                missing_info TEXT NOT NULL,
+                can_quote BOOLEAN DEFAULT 0,
+                price_min INTEGER,
+                price_max INTEGER,
+                price_basis TEXT,
+                quick_tags TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE,
+                FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+            )
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ai_analyses_session_id
+            ON ai_analyses(session_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_ai_analyses_message_id
+            ON ai_analyses(message_id)
+        """)
+
+        # 挽留话术模板表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS retention_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                is_default BOOLEAN DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # 检查是否需要插入默认挽留话术
+        cursor.execute("SELECT COUNT(*) FROM retention_templates")
+        retention_count = cursor.fetchone()[0]
+
+        if retention_count == 0:
+            cursor.execute("""
+                INSERT INTO retention_templates (content, is_default) VALUES (?, ?)
+            """, ("虽然因为你的预算不够没成，但特别愿意帮你把把关～你可以给我链接下一个10r订单，我微信转你12r，你要写的东西我也可以帮你看看梳理一下，相当于你多2r+免费咨询。", 1))

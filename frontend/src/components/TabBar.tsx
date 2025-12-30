@@ -7,7 +7,8 @@ interface TabBarProps {
 
 export function TabBar({ activeTab, onTabChange }: TabBarProps) {
   const tabs: { id: TabType; label: string }[] = [
-    { id: 'analyze', label: '消息分析' },
+    { id: 'sessions', label: '对话助手' },
+    { id: 'analyze', label: '快速分析' },
     { id: 'history', label: '历史记录' },
   ];
 

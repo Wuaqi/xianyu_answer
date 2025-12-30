@@ -62,6 +62,7 @@ export interface AppState {
 export interface PromptTemplates {
   analyze: string;
   system: string;
+  analyze_v3: string;
 }
 
 // ========== 历史记录类型 ==========
@@ -137,4 +138,148 @@ export interface UpdateTemplateRequest {
 
 // ========== 标签页类型 ==========
 
-export type TabType = 'analyze' | 'history';
+export type TabType = 'analyze' | 'sessions' | 'history';
+
+
+// ========== V3 会话类型 ==========
+
+export type SessionStatus = 'active' | 'closed';
+export type SessionDealStatus = 'pending' | 'success' | 'failed';
+
+export interface SessionSummary {
+  id: number;
+  status: SessionStatus;
+  dealStatus: SessionDealStatus;
+  dealPrice: number | null;
+  articleType: string | null;
+  previewMessage: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SessionListResponse {
+  items: SessionSummary[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface CreateSessionRequest {
+  firstMessage?: string;
+}
+
+export interface UpdateSessionRequest {
+  status?: SessionStatus;
+  dealStatus?: SessionDealStatus;
+  dealPrice?: number;
+  articleType?: string;
+  requirementSummary?: string;
+}
+
+// ========== V3 消息类型 ==========
+
+export interface Message {
+  id: number;
+  sessionId: number;
+  role: 'buyer' | 'seller';
+  content: string;
+  createdAt: string;
+}
+
+export interface CreateMessageRequest {
+  content: string;
+  role?: 'buyer' | 'seller';
+}
+
+export interface AddMessageRequest {
+  content: string;
+  role?: 'buyer' | 'seller';
+  llmConfig?: LLMConfig;
+}
+
+// ========== V3 AI分析类型 ==========
+
+export interface ExtractedInfoV3 {
+  articleType?: string;
+  topic?: string;
+  wordCount?: number;
+  deadline?: string;
+  hasReference?: boolean;
+  specialRequirements: string[];
+}
+
+export interface PriceEstimateV3 {
+  canQuote: boolean;
+  min?: number;
+  max?: number;
+  basis?: string;
+}
+
+export interface AIAnalysis {
+  id: number;
+  sessionId: number;
+  messageId: number;
+  suggestedReplies: string[];
+  extractedInfo: ExtractedInfoV3;
+  missingInfo: string[];
+  canQuote: boolean;
+  priceEstimate?: PriceEstimateV3;
+  quickTags: string[];
+  createdAt: string;
+}
+
+export interface MessageWithAnalysis {
+  message: Message;
+  analysis: AIAnalysis | null;
+}
+
+export interface SendMessageResponse {
+  message: Message;
+  analysis: AIAnalysis | null;
+  error?: string;  // 分析失败时的错误信息
+}
+
+// ========== V3 会话详情类型 ==========
+
+export interface SessionDetail {
+  id: number;
+  status: SessionStatus;
+  dealStatus: SessionDealStatus;
+  dealPrice: number | null;
+  articleType: string | null;
+  requirementSummary: string | null;
+  messages: MessageWithAnalysis[];
+  latestAnalysis: AIAnalysis | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ========== V3 挽留话术类型 ==========
+
+export interface RetentionTemplate {
+  id: number;
+  content: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
+export interface UpdateRetentionTemplateRequest {
+  content: string;
+}
+
+// ========== V3 需求要点类型 ==========
+
+export interface RequirementSummary {
+  articleType: string;
+  wordCount?: number;
+  deadline?: string;
+  topic?: string;
+  requirements: string[];
+  notes?: string;
+}
+
+export interface SummarizeRequest {
+  llmConfig: LLMConfig;
+}

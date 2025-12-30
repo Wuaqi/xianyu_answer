@@ -552,19 +552,21 @@ xianyu_answer/
 ```bash
 # 1. SSH 登录服务器
 ssh root@111.231.107.149
+# 如果 SSH 被封禁，使用腾讯云控制台 VNC 登录
 
-# 2. 安装 Miniconda
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh -b -p /root/miniconda3
-echo 'export PATH="/root/miniconda3/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+# 2. 宝塔面板安装 Python 3.11
+# 宝塔面板 → 软件商店 → 搜索「Python项目管理器」→ 安装
+# Python项目管理器 → 版本管理 → 安装 Python 3.11
 
-# 3. 创建 Python 环境
-conda create -n xianyu python=3.11 -y
-conda activate xianyu
+# 3. 安装进程守护管理器（Python项目管理器的依赖）
+# 宝塔面板 → 软件商店 → 搜索「进程守护管理器」→ 安装
 
-# 4. Node.js（已通过宝塔安装，跳过此步）
+# 4. Node.js（如未安装）
+# 宝塔面板 → 软件商店 → 搜索「Node.js版本管理器」→ 安装
+# 安装完成后选择 Node.js 18.x 或 22.x 版本
 ```
+
+> **说明**：使用宝塔的 Python 版本管理，无需安装 Miniconda。
 
 #### 8.3.2 部署项目代码
 
@@ -575,16 +577,15 @@ cd /www/wwwroot/xianyu_answer
 
 # 2. 克隆代码（使用 HTTPS，无需 SSH 密钥）
 git clone https://github.com/Wuaqi/xianyu_answer.git .
+# 如果失败，使用镜像：git clone https://ghproxy.com/https://github.com/Wuaqi/xianyu_answer.git .
 
-# 3. 安装后端依赖
-cd backend
-/root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
-
-# 4. 构建前端
-cd ../frontend
+# 3. 构建前端
+cd frontend
 npm install
 npm run build
 ```
+
+> **注意**：后端依赖由宝塔 Python 项目管理器自动安装，无需手动执行 pip install。
 
 #### 8.3.3 宝塔面板配置
 
@@ -592,36 +593,40 @@ npm run build
 
 1. 宝塔面板 → **网站** → **添加站点**
 2. 配置项：
-   - 域名：`111.231.107.149:8080`（注意带端口）
+   - 域名：`111.231.107.149`（不带端口，后面改 Nginx 配置）
    - 根目录：`/www/wwwroot/xianyu_answer/frontend/dist`
    - PHP版本：**纯静态**
    - 数据库：不创建
 
-**步骤 2：配置 Python 项目**
+**步骤 2：配置后端服务**
 
-1. 宝塔面板 → **软件商店** → 搜索 **Python项目管理器** → 安装（如未安装）
-2. 打开 **Python项目管理器** → **添加项目**
-3. 配置项：
+> 推荐使用「进程守护管理器」，更稳定。
+
+1. 宝塔面板 → **进程守护管理器** → **添加守护进程**
+2. 配置项：
 
 | 配置项 | 值 |
 |--------|-----|
-| 项目名称 | xianyu_answer |
-| 项目路径 | /www/wwwroot/xianyu_answer/backend |
-| Python版本 | /root/miniconda3/envs/xianyu/bin/python |
-| 框架 | FastAPI |
-| 启动文件 | run.py |
-| 端口 | 8000 |
-| 开机启动 | ✅ 勾选 |
+| 名称 | xianyu_answer |
+| 启动命令 | /www/wwwroot/xianyu_answer/backend/*_venv/bin/python3 run.py |
+| 运行目录 | /www/wwwroot/xianyu_answer/backend |
+| 进程数量 | 1 |
+| 启动用户 | root |
+
+> **说明**：`*_venv` 是宝塔自动创建的虚拟环境目录，名称类似 `85f635ebc95f2e1f72b514724dcf52ca_venv`，请根据实际目录名修改。
+>
+> 如果虚拟环境不存在，先通过 Python 项目管理器添加项目（会自动创建虚拟环境并安装依赖），然后删除项目，改用进程守护管理器。
 
 **步骤 3：配置 Nginx**
 
 1. 宝塔面板 → **网站** → 点击 `111.231.107.149` → **设置**
 2. 点击左侧 **配置文件**
-3. 替换为以下内容：
+3. 修改 `listen 80` 为 `listen 8080`，完整配置如下：
 
 ```nginx
 server {
     listen 8080;  # 使用 8080 端口，避免与默认站点冲突
+    listen [::]:8080;
     server_name 111.231.107.149;
 
     # 前端静态文件目录
@@ -653,12 +658,15 @@ server {
 
 4. 点击 **保存** → 重载 Nginx
 
-**步骤 4：开放防火墙端口**
+**步骤 4：开放防火墙端口（重要！）**
 
-1. 宝塔面板 → **安全** → **防火墙** → 添加端口 `8080`
-2. 腾讯云控制台 → **轻量应用服务器** → **防火墙** → 添加规则：
+**两层防火墙都要开放**：
+
+1. **宝塔防火墙**：宝塔面板 → **安全** → **防火墙** → 添加端口 `8080`
+2. **腾讯云防火墙**：腾讯云控制台 → **轻量应用服务器** → 选择服务器 → **防火墙**（页面上方标签）→ 添加规则：
    - 协议：TCP
    - 端口：8080
+   - 来源：全部IPv4地址
    - 策略：允许
 
 **步骤 5：验证部署**
@@ -667,6 +675,8 @@ server {
 2. 检查页面是否正常加载
 3. 点击设置，配置大模型 API
 4. 测试消息分析功能
+
+> 如果无法访问，参考 8.7.3 访问问题排查。
 
 ### 8.4 部署方式二：域名部署（备案通过后）
 
@@ -839,8 +849,9 @@ cat > /www/wwwroot/xianyu_answer/update.sh << 'EOF'
 set -e
 
 PROJECT_DIR="/www/wwwroot/xianyu_answer"
-PYTHON="/root/miniconda3/envs/xianyu/bin/python"
-PIP="/root/miniconda3/envs/xianyu/bin/pip"
+# 找到虚拟环境目录（宝塔自动创建的）
+VENV_DIR=$(ls -d ${PROJECT_DIR}/backend/*_venv 2>/dev/null | head -1)
+PIP="${VENV_DIR}/bin/pip3"
 
 cd $PROJECT_DIR
 
@@ -866,7 +877,7 @@ npm run build
 echo ""
 echo "[4/4] 更新完成！"
 echo ""
-echo ">>> 请在宝塔面板重启 Python 项目 <<<"
+echo ">>> 请在宝塔面板「进程守护管理器」重启 xianyu_answer 项目 <<<"
 echo ""
 EOF
 
@@ -884,14 +895,44 @@ cd /www/wwwroot/xianyu_answer
 
 ### 8.7 常见问题排查
 
+#### 8.7.1 部署阶段问题
+
+| 问题 | 原因 | 解决方法 |
+|------|------|----------|
+| **Conda 服务条款错误** | Anaconda 需要接受 ToS | 执行 `conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main` |
+| **conda activate 失败** | conda 未初始化 | 执行 `conda init bash && source ~/.bashrc` |
+| **GitHub 克隆失败** | 网络问题 | 使用镜像 `git clone https://ghproxy.com/https://github.com/...` 或手动上传 |
+| **SSH 连接被重置** | 尝试次数过多被封禁 | 等待几分钟，或通过腾讯云控制台 VNC 登录 |
+| **宝塔无 FastAPI 框架选项** | 正常现象 | 框架选择 `python`，启动方式选择 `python` |
+| **进程守护插件未安装** | 依赖缺失 | 宝塔软件商店安装「进程守护管理器」 |
+| **Python 项目添加失败** | 宝塔兼容问题 | 改用「进程守护管理器」直接添加守护进程 |
+| **虚拟环境无 python 命令** | 只有 python3 | 使用 `python3` 而不是 `python` 运行 |
+| **添加站点端口范围不合法** | 域名字段不能带端口 | 先用 IP 添加，再修改 Nginx 配置改端口 |
+
+#### 8.7.2 运行阶段问题
+
 | 问题 | 可能原因 | 解决方法 |
 |------|----------|----------|
 | 页面白屏/404 | Nginx 根目录配置错误 | 检查 root 是否指向 `frontend/dist` |
-| API 返回 404 | Python 项目未启动 | 宝塔面板检查 Python 项目状态 |
-| API 返回 502 | FastAPI 崩溃 | 查看 Python 项目日志，重启服务 |
+| API 返回 404 | Python 项目未启动 | 宝塔面板检查进程守护管理器状态 |
+| API 返回 502 | FastAPI 崩溃 | 查看项目日志，重启服务 |
 | API 请求超时 | LLM API 响应慢 | 增加 `proxy_read_timeout` 值 |
 | 前端路由 404 | Nginx 未配置 SPA 支持 | 添加 `try_files $uri $uri/ /index.html` |
 | SSL 证书申请失败 | 域名未解析/备案未通过 | 确认 DNS 生效且备案已完成 |
+
+#### 8.7.3 访问问题（重要）
+
+| 问题 | 原因 | 解决方法 |
+|------|------|----------|
+| **外部无法访问 8080 端口** | 腾讯云防火墙未开放 | 在服务器**详情页上方**的「防火墙」面板添加规则（不是宝塔防火墙） |
+| 防火墙规则已添加但仍无法访问 | 规则未生效 | 删除规则，等待 10 秒，重新添加 |
+| 服务器内部能访问，外部不行 | 云防火墙问题 | 用 `tcpdump -i eth0 port 8080` 监听确认请求是否到达 |
+
+> **注意**：腾讯云轻量服务器有**两层防火墙**：
+> 1. **云防火墙**：腾讯云控制台 → 服务器详情页 → 上方「防火墙」标签（必须配置）
+> 2. **系统防火墙**：宝塔面板 → 安全 → 防火墙（也需要配置）
+>
+> 两层都要开放端口才能访问！
 
 **查看日志命令：**
 
@@ -902,8 +943,11 @@ tail -f /www/wwwlogs/xianyu_answer.log
 # Nginx 错误日志
 tail -f /www/wwwlogs/xianyu_answer.error.log
 
-# Python 项目日志
-# 宝塔面板 → Python项目管理器 → 点击项目 → 日志
+# 进程守护管理器日志
+# 宝塔面板 → 进程守护管理器 → 点击项目 → 日志
+
+# 测试端口是否被外部访问
+tcpdump -i eth0 port 8080 -n
 ```
 
 ### 8.8 SSL 证书说明

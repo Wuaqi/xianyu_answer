@@ -230,7 +230,8 @@ xianyu_answer/
 | 已有站点 | wyqaii.top（默认站点，端口 80） |
 | 本项目域名 | xianyu.wyqaii.top |
 | 项目目录 | /www/wwwroot/xianyu_answer |
-| Python 环境 | /root/miniconda3/envs/xianyu |
+| Python 环境 | 宝塔 Python 项目管理器（虚拟环境） |
+| 进程管理 | 宝塔进程守护管理器（Supervisor） |
 
 ### 访问地址
 
@@ -251,15 +252,23 @@ cd /www/wwwroot/xianyu_answer
 
 # 或手动更新
 git pull origin main
-cd backend && /root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
-cd ../frontend && npm install && npm run build
+cd frontend && npm install && npm run build
 
-# 宝塔面板重启 Python 项目
+# 宝塔面板「进程守护管理器」重启 xianyu_answer 项目
 ```
 
 ### 详细文档
 
 完整部署指南请参考 [Prd.md 第八章](./Prd.md#八部署方案)
+
+### 常见部署问题
+
+| 问题 | 解决方法 |
+|------|----------|
+| 外部无法访问 8080 | 检查腾讯云控制台防火墙（服务器详情页上方） |
+| Python 项目添加失败 | 改用进程守护管理器 |
+| 虚拟环境无 python | 使用 python3 代替 |
+| GitHub 克隆失败 | 使用镜像 ghproxy.com |
 
 ## 版本历史
 

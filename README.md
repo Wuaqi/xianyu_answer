@@ -187,40 +187,35 @@ xianyu_answer/
 # 1. SSH 登录服务器
 ssh root@111.231.107.149
 
-# 2. 安装 Miniconda 并创建环境
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash Miniconda3-latest-Linux-x86_64.sh -b -p /root/miniconda3
-source ~/.bashrc
-conda create -n xianyu python=3.11 -y
+# 2. 宝塔面板安装环境
+# - Python项目管理器 → 版本管理 → 安装 Python 3.11
+# - 进程守护管理器
+# - Node.js版本管理器 → 安装 Node.js 18+
 
 # 3. 克隆代码
 mkdir -p /www/wwwroot/xianyu_answer
 cd /www/wwwroot/xianyu_answer
 git clone https://github.com/Wuaqi/xianyu_answer.git .
 
-# 4. 安装后端依赖
-cd backend
-/root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
-
-# 5. 构建前端（Node.js 已安装）
-cd ../frontend
+# 4. 构建前端
+cd frontend
 npm install && npm run build
 ```
 
 然后在宝塔面板配置：
-1. 添加网站：`111.231.107.149:8080`，根目录 `frontend/dist`
-2. Python项目管理器添加 FastAPI 项目（端口 8000）
-3. 配置 Nginx（监听 8080，反向代理 /api/）
-4. 开放防火墙 8080 端口（宝塔 + 腾讯云）
+1. Python项目管理器添加项目（创建虚拟环境和安装依赖）
+2. 进程守护管理器添加守护进程（运行后端）
+3. 添加网站 `111.231.107.149`，根目录 `frontend/dist`
+4. 修改 Nginx 配置（端口改 8080，添加 /api/ 反向代理）
+5. 开放防火墙 8080 端口（**宝塔 + 腾讯云控制台都要开**）
 
 ### 项目更新
 
 ```bash
 cd /www/wwwroot/xianyu_answer
 git pull origin main
-cd backend && /root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
-cd ../frontend && npm install && npm run build
-# 宝塔面板重启 Python 项目
+cd frontend && npm install && npm run build
+# 宝塔面板「进程守护管理器」重启项目
 ```
 
 ### 详细文档
@@ -231,7 +226,7 @@ cd ../frontend && npm install && npm run build
 - 8.4 域名部署（备案通过后）
 - 8.5 从 8080 端口迁移到域名
 - 8.6 项目更新流程
-- 8.7 常见问题排查
+- 8.7 常见问题排查（部署、运行、访问问题）
 - 8.8 SSL 证书说明
 
 ## License

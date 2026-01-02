@@ -219,7 +219,7 @@ npm install && npm run build
 
 ### 项目更新
 
-**方式一：Git 拉取**
+**方式一：Git 拉取**（需要服务器能访问 GitHub）
 ```bash
 cd /www/wwwroot/xianyu_answer
 git pull origin main
@@ -229,23 +229,39 @@ cd frontend && npm install && npm run build
 
 **方式二：手动打包上传（推荐，适合国内服务器）**
 
-本地打包：
+本地打包并上传：
 ```bash
 cd /Users/wyq/Developer/xianyu_answer
-tar --exclude='node_modules' --exclude='.git' --exclude='backend/data/xianyu.db' -czvf ../xianyu_answer.tar.gz .
+tar --exclude='node_modules' --exclude='.git' --exclude='backend/data/xianyu.db' --exclude='backend/venv' -czvf ../xianyu_answer.tar.gz .
 scp ../xianyu_answer.tar.gz root@111.231.107.149:/www/wwwroot/
 ```
 
 服务器部署：
 ```bash
 cd /www/wwwroot
-cp xianyu_answer/backend/data/xianyu.db ~/xianyu.db.backup  # 备份数据库
+
+# 备份数据库和虚拟环境
+cp xianyu_answer/backend/data/xianyu.db ~/xianyu.db.backup
+mv xianyu_answer/backend/venv ~/venv.backup
+
+# 解压新代码
 rm -rf xianyu_answer && mkdir xianyu_answer
 tar -xzvf xianyu_answer.tar.gz -C xianyu_answer
-cp ~/xianyu.db.backup xianyu_answer/backend/data/xianyu.db  # 恢复数据库
-cd xianyu_answer/frontend && npm install && npm run build
-# 宝塔面板「进程守护管理器」重启项目
+
+# 恢复数据库和虚拟环境
+cp ~/xianyu.db.backup xianyu_answer/backend/data/xianyu.db
+mv ~/venv.backup xianyu_answer/backend/venv
+
+# 构建前端
+cd xianyu_answer/frontend
+rm -rf dist && npm install && npm run build
+
+# 清理并重启
+rm /www/wwwroot/xianyu_answer.tar.gz
+# 宝塔面板「进程守护管理器」重启 xianyu_answer
 ```
+
+> 如果 `requirements.txt` 有新增依赖，需额外执行：`cd /www/wwwroot/xianyu_answer/backend && ./venv/bin/pip install -r requirements.txt`
 
 ### 详细文档
 

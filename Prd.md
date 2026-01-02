@@ -852,18 +852,14 @@ cd frontend && npm install && npm run build
 # 进入项目目录
 cd /Users/wyq/Developer/xianyu_answer
 
-# 打包项目（排除 node_modules、.git、数据库）
-tar --exclude='node_modules' --exclude='.git' --exclude='backend/data/xianyu.db' --exclude='__pycache__' --exclude='.DS_Store' -czvf ../xianyu_answer.tar.gz .
-```
+# 打包项目（排除 node_modules、.git、数据库、虚拟环境）
+tar --exclude='node_modules' --exclude='.git' --exclude='backend/data/xianyu.db' --exclude='backend/venv' --exclude='__pycache__' --exclude='.DS_Store' -czvf ../xianyu_answer.tar.gz .
 
-**步骤 2：上传到服务器**
-
-```bash
 # 上传压缩包
-scp /Users/wyq/Developer/xianyu_answer.tar.gz root@111.231.107.149:/www/wwwroot/
+scp ../xianyu_answer.tar.gz root@111.231.107.149:/www/wwwroot/
 ```
 
-**步骤 3：服务器部署**
+**步骤 2：服务器部署**
 
 ```bash
 # SSH 登录服务器
@@ -871,19 +867,22 @@ ssh root@111.231.107.149
 
 cd /www/wwwroot
 
-# 备份数据库（重要！）
+# 备份数据库和虚拟环境（重要！）
 cp xianyu_answer/backend/data/xianyu.db ~/xianyu.db.backup
+mv xianyu_answer/backend/venv ~/venv.backup
 
 # 删除旧目录，解压新文件
 rm -rf xianyu_answer
 mkdir xianyu_answer
 tar -xzvf xianyu_answer.tar.gz -C xianyu_answer
 
-# 恢复数据库
-cp ~/xianyu.db.backup /www/wwwroot/xianyu_answer/backend/data/xianyu.db
+# 恢复数据库和虚拟环境
+cp ~/xianyu.db.backup xianyu_answer/backend/data/xianyu.db
+mv ~/venv.backup xianyu_answer/backend/venv
 
-# 安装依赖并构建前端
+# 构建前端（先删除 dist 避免 .user.ini 冲突）
 cd xianyu_answer/frontend
+rm -rf dist
 npm install
 npm run build
 
@@ -891,9 +890,17 @@ npm run build
 rm /www/wwwroot/xianyu_answer.tar.gz
 ```
 
-**步骤 4：重启服务**
+**步骤 3：重启服务**
 
-在宝塔面板「进程守护管理器」重启 `xianyu_answer` 项目。
+在宝塔面板「进程守护管理器」点击 `xianyu_answer` 的「重启」按钮。
+
+**步骤 4：如果有新增依赖**
+
+当 `requirements.txt` 有变更时，需额外执行：
+```bash
+cd /www/wwwroot/xianyu_answer/backend
+./venv/bin/pip install -r requirements.txt
+```
 
 #### 8.6.3 一键更新脚本
 

@@ -902,60 +902,22 @@ cd /www/wwwroot/xianyu_answer/backend
 ./venv/bin/pip install -r requirements.txt
 ```
 
-#### 8.6.3 一键更新脚本
+#### 8.6.3 一键部署脚本（推荐）
 
-在服务器创建更新脚本，简化更新流程：
-
-```bash
-# 创建脚本
-cat > /www/wwwroot/xianyu_answer/update.sh << 'EOF'
-#!/bin/bash
-set -e
-
-PROJECT_DIR="/www/wwwroot/xianyu_answer"
-# 找到虚拟环境目录（宝塔自动创建的）
-VENV_DIR=$(ls -d ${PROJECT_DIR}/backend/*_venv 2>/dev/null | head -1)
-PIP="${VENV_DIR}/bin/pip3"
-
-cd $PROJECT_DIR
-
-echo "=========================================="
-echo "  闲鱼代写助手 - 项目更新脚本"
-echo "=========================================="
-
-echo ""
-echo "[1/4] 拉取最新代码..."
-git pull origin main
-
-echo ""
-echo "[2/4] 更新后端依赖..."
-cd backend
-$PIP install -r requirements.txt --quiet
-
-echo ""
-echo "[3/4] 构建前端..."
-cd ../frontend
-npm install --silent
-npm run build
-
-echo ""
-echo "[4/4] 更新完成！"
-echo ""
-echo ">>> 请在宝塔面板「进程守护管理器」重启 xianyu_answer 项目 <<<"
-echo ""
-EOF
-
-# 添加执行权限
-chmod +x /www/wwwroot/xianyu_answer/update.sh
-```
-
-以后更新只需执行：
+项目包含本地部署脚本 `deploy.sh`，可自动完成打包、上传、部署：
 
 ```bash
-cd /www/wwwroot/xianyu_answer
-./update.sh
-# 然后去宝塔面板重启 Python 项目
+cd /Users/wyq/Developer/xianyu_answer
+./deploy.sh
 ```
+
+脚本会自动：
+1. 打包项目（排除 node_modules、.git、数据库、虚拟环境）
+2. 上传到服务器
+3. 备份并恢复数据库和虚拟环境
+4. 构建前端
+
+完成后只需在宝塔面板「进程守护管理器」重启 `xianyu_answer` 即可。
 
 ### 8.7 常见问题排查
 

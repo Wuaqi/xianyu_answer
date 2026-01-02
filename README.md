@@ -219,15 +219,14 @@ npm install && npm run build
 
 ### 项目更新
 
-**方式一：Git 拉取**（需要服务器能访问 GitHub）
+**方式一：一键部署脚本（推荐）**
 ```bash
-cd /www/wwwroot/xianyu_answer
-git pull origin main
-cd frontend && npm install && npm run build
-# 宝塔面板「进程守护管理器」重启项目
+cd /Users/wyq/Developer/xianyu_answer
+./deploy.sh
+# 完成后在宝塔面板「进程守护管理器」重启 xianyu_answer
 ```
 
-**方式二：手动打包上传（推荐，适合国内服务器）**
+**方式二：手动打包上传**
 
 本地打包并上传：
 ```bash

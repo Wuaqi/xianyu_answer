@@ -454,7 +454,7 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
                 rows={2}
               />
               <button
-                onClick={handleSendMessage}
+                onClick={() => handleSendMessage()}
                 disabled={!inputValue.trim() || isAnalyzing || !llmConfig}
                 className="px-4 md:px-6 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm md:text-base"
               >

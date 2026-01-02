@@ -1,8 +1,52 @@
 @import "tailwindcss";
 
+/* 基础样式 */
 body {
   margin: 0;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 防止移动端双击缩放 */
+* {
+  touch-action: manipulation;
+}
+
+/* 移动端安全区域支持 */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+/* 移动端输入框获取焦点时不缩放 */
+input, textarea, select {
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  input, textarea, select {
+    font-size: inherit;
+  }
+}
+
+/* 移动端滚动优化 */
+.overflow-y-auto {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 隐藏移动端滚动条 */
+@media (max-width: 767px) {
+  .overflow-y-auto::-webkit-scrollbar {
+    display: none;
+  }
+  .overflow-y-auto {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
 /* 侧边栏滑入动画 */
@@ -17,4 +61,11 @@ body {
 
 .animate-slide-in-right {
   animation: slide-in-right 0.2s ease-out;
+}
+
+/* 移动端按钮点击反馈 */
+@media (max-width: 767px) {
+  button:active {
+    opacity: 0.8;
+  }
 }

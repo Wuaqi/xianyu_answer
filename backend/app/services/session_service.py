@@ -428,6 +428,54 @@ def update_retention_template(request: UpdateRetentionTemplateRequest) -> bool:
         return True
 
 
+# ========== 要好评话术管理 ==========
+
+def get_review_template() -> Optional[RetentionTemplate]:
+    """获取默认要好评话术"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        cursor.execute(
+            "SELECT * FROM review_templates WHERE is_default = 1 LIMIT 1"
+        )
+        row = cursor.fetchone()
+
+        if row is None:
+            return None
+
+        return RetentionTemplate(
+            id=row["id"],
+            content=row["content"],
+            isDefault=bool(row["is_default"]),
+            createdAt=datetime.fromisoformat(row["created_at"]),
+        )
+
+
+def update_review_template(request: UpdateRetentionTemplateRequest) -> bool:
+    """更新默认要好评话术"""
+    with get_db() as conn:
+        cursor = conn.cursor()
+
+        # 先检查是否存在默认模板
+        cursor.execute("SELECT id FROM review_templates WHERE is_default = 1")
+        row = cursor.fetchone()
+
+        if row:
+            # 更新现有模板
+            cursor.execute(
+                "UPDATE review_templates SET content = ? WHERE id = ?",
+                (request.content, row["id"])
+            )
+        else:
+            # 创建新模板
+            cursor.execute(
+                "INSERT INTO review_templates (content, is_default) VALUES (?, 1)",
+                (request.content,)
+            )
+
+        return True
+
+
 # ========== 辅助函数 ==========
 
 def _row_to_message(row) -> Message:

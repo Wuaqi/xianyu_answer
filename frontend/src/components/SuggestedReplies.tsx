@@ -1,6 +1,8 @@
 /**
  * 推荐回复组件
- * 显示3-5个AI生成的回复选项，每个都有复制按钮
+ * 显示3-4个AI生成的回复选项，每个都有复制按钮
+ * 回复风格：亲切友好、专业简洁、热情积极、其他风格
+ * 注意：所有回复均不包含具体报价，报价由用户自行决定
  */
 
 import { useState } from 'react';
@@ -57,8 +59,8 @@ export function SuggestedReplies({ replies }: SuggestedRepliesProps) {
     }
   };
 
-  // 回复风格标签
-  const styleLabels = ['亲切友好', '专业简洁', '热情积极', '包含报价', '其他风格'];
+  // 回复风格标签（3-4个选项）
+  const styleLabels = ['亲切友好', '专业简洁', '热情积极', '其他风格'];
 
   return (
     <div className="space-y-2 md:space-y-3">

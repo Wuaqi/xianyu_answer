@@ -118,6 +118,24 @@ async def update_retention_template(request: UpdateRetentionTemplateRequest):
     return {"success": True}
 
 
+# ========== 要好评话术 ==========
+
+@router.get("/review-template", response_model=RetentionTemplate)
+async def get_review_template():
+    """获取默认要好评话术"""
+    template = session_service.get_review_template()
+    if template is None:
+        raise HTTPException(status_code=404, detail="要好评话术不存在")
+    return template
+
+
+@router.put("/review-template")
+async def update_review_template(request: UpdateRetentionTemplateRequest):
+    """更新默认要好评话术"""
+    session_service.update_review_template(request)
+    return {"success": True}
+
+
 # ========== 消息分析 ==========
 
 @router.post("/sessions/{session_id}/analyze", response_model=SendMessageResponse)

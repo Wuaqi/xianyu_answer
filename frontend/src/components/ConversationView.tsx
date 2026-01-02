@@ -3,12 +3,17 @@
  * 显示会话中的所有消息和分析结果
  */
 
-import type { MessageWithAnalysis, ExtractedInfoV3 } from '../types';
+import { useState } from 'react';
+import type { MessageWithAnalysis, ExtractedInfoV3, AIAnalysis, SessionStatus } from '../types';
 
 interface ConversationViewProps {
   messages: MessageWithAnalysis[];
   isLoading?: boolean;
   pendingMessage?: string | null;
+  latestAnalysis?: AIAnalysis | null;
+  sessionStatus?: SessionStatus;  // 会话状态
+  onSelectReply?: (reply: string) => void;  // 选择回复的回调
+  selectedReplies?: Record<number, string>;  // 每轮对话选中的回复 { messageId: reply }
 }
 
 /**
@@ -67,7 +72,8 @@ function MessageBubble({
  * 提取信息展示组件
  */
 function ExtractedInfoCard({ info }: { info: ExtractedInfoV3 }) {
-  const hasAnyInfo = info.articleType || info.topic || info.wordCount ||
+  const hasAnyInfo = info.articleType || info.topic ||
+                     (info.wordCount != null && info.wordCount > 0) ||
                      info.deadline || info.hasReference !== undefined ||
                      (info.specialRequirements && info.specialRequirements.length > 0);
 
@@ -89,9 +95,9 @@ function ExtractedInfoCard({ info }: { info: ExtractedInfoV3 }) {
         {info.topic && (
           <div><span className="text-gray-400">主题:</span> {info.topic}</div>
         )}
-        {info.wordCount && (
+        {info.wordCount != null && info.wordCount > 0 ? (
           <div><span className="text-gray-400">字数:</span> {info.wordCount}字</div>
-        )}
+        ) : null}
         {info.deadline && (
           <div><span className="text-gray-400">截止:</span> {info.deadline}</div>
         )}
@@ -111,9 +117,26 @@ function ExtractedInfoCard({ info }: { info: ExtractedInfoV3 }) {
 }
 
 /**
- * 缺失信息提示
+ * 已选择的回复显示
  */
-function MissingInfoAlert({ items }: { items: string[] }) {
+function SelectedReplyCard({ reply }: { reply: string }) {
+  return (
+    <div className="bg-green-50 border border-green-200 rounded-lg p-2 md:p-3 text-xs md:text-sm">
+      <div className="flex items-center gap-1.5 md:gap-2 mb-1.5 md:mb-2">
+        <svg className="w-3.5 md:w-4 h-3.5 md:h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        <span className="font-medium text-green-700">已选回复</span>
+      </div>
+      <p className="text-gray-700 whitespace-pre-wrap">{reply}</p>
+    </div>
+  );
+}
+
+/**
+ * 缺失信息提示（导出供侧边栏使用）
+ */
+export function MissingInfoAlert({ items }: { items: string[] }) {
   if (!items || items.length === 0) return null;
 
   return (
@@ -139,7 +162,103 @@ function MissingInfoAlert({ items }: { items: string[] }) {
   );
 }
 
-export function ConversationView({ messages, isLoading, pendingMessage }: ConversationViewProps) {
+/**
+ * 可选择的推荐回复组件
+ */
+function SelectableReplies({
+  replies,
+  onSelect,
+}: {
+  replies: string[];
+  onSelect: (reply: string) => void;
+}) {
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  // 兼容 HTTP 环境的复制函数
+  const copyToClipboard = async (text: string): Promise<boolean> => {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // fallback
+      }
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    try {
+      const success = document.execCommand('copy');
+      document.body.removeChild(textarea);
+      return success;
+    } catch {
+      document.body.removeChild(textarea);
+      return false;
+    }
+  };
+
+  const handleCopyAndSelect = async (reply: string, index: number) => {
+    const success = await copyToClipboard(reply);
+    if (success) {
+      setCopiedIndex(index);
+      setTimeout(() => {
+        setCopiedIndex(null);
+        onSelect(reply);
+      }, 500);
+    }
+  };
+
+  const styleLabels = ['亲切友好', '专业简洁', '热情积极', '其他风格'];
+
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs md:text-sm font-medium text-gray-700 flex items-center gap-1.5">
+        <svg className="w-3.5 md:w-4 h-3.5 md:h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+        推荐回复（点击选用）
+      </h4>
+      <div className="space-y-2">
+        {replies.map((reply, index) => (
+          <button
+            key={index}
+            onClick={() => handleCopyAndSelect(reply, index)}
+            className={`w-full text-left border rounded-lg p-2 md:p-3 transition-all ${
+              copiedIndex === index
+                ? 'border-green-400 bg-green-50'
+                : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs text-gray-500">{styleLabels[index] || `选项 ${index + 1}`}</span>
+              <span className={`text-xs px-2 py-0.5 rounded ${
+                copiedIndex === index ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {copiedIndex === index ? '已复制' : '点击选用'}
+              </span>
+            </div>
+            <p className="text-xs md:text-sm text-gray-700 line-clamp-3">{reply}</p>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function ConversationView({
+  messages,
+  isLoading,
+  pendingMessage,
+  latestAnalysis,
+  sessionStatus = 'active',
+  onSelectReply,
+  selectedReplies = {},
+}: ConversationViewProps) {
   // 如果没有消息且没有待发送消息，显示空状态
   if (messages.length === 0 && !pendingMessage) {
     return (
@@ -155,26 +274,62 @@ export function ConversationView({ messages, isLoading, pendingMessage }: Conver
     );
   }
 
+  // 找到最后一条买家消息
+  const lastBuyerMessage = [...messages].reverse().find(m => m.message.role === 'buyer');
+  const lastBuyerMessageId = lastBuyerMessage?.message.id;
+  const isSessionActive = sessionStatus === 'active';
+
   return (
     <div className="flex-1 overflow-y-auto space-y-3 md:space-y-4 p-3 md:p-4">
-      {messages.map(({ message, analysis }) => (
-        <div key={message.id} className="space-y-2 md:space-y-3">
-          {/* 消息气泡 */}
-          <MessageBubble
-            role={message.role as 'buyer' | 'seller'}
-            content={message.content}
-            createdAt={message.createdAt}
-          />
+      {messages.map(({ message, analysis }, index) => {
+        const isLastBuyerMessage = message.id === lastBuyerMessageId && message.role === 'buyer';
+        const selectedReply = selectedReplies[message.id];
+        const isLastMessage = index === messages.length - 1;
 
-          {/* 买家消息后显示分析结果 */}
-          {message.role === 'buyer' && analysis && (
-            <div className="ml-2 md:ml-4 space-y-1.5 md:space-y-2">
-              <ExtractedInfoCard info={analysis.extractedInfo} />
-              <MissingInfoAlert items={analysis.missingInfo} />
-            </div>
-          )}
-        </div>
-      ))}
+        return (
+          <div key={message.id} className="space-y-2 md:space-y-3">
+            {/* 消息气泡 */}
+            <MessageBubble
+              role={message.role as 'buyer' | 'seller'}
+              content={message.content}
+              createdAt={message.createdAt}
+            />
+
+            {/* 买家消息后的分析结果 */}
+            {message.role === 'buyer' && analysis && (
+              <div className="ml-2 md:ml-4 space-y-2 md:space-y-3">
+                {/* 如果这轮已选择了回复，显示已选回复 */}
+                {selectedReply && (
+                  <SelectedReplyCard reply={selectedReply} />
+                )}
+
+                {/* 最后一条买家消息：显示提取信息和推荐回复 */}
+                {isLastBuyerMessage && isLastMessage && (
+                  <>
+                    {/* 已提取信息 */}
+                    <ExtractedInfoCard info={analysis.extractedInfo} />
+
+                    {/* 如果会话进行中且未选择回复，显示推荐回复 */}
+                    {isSessionActive && !selectedReply && latestAnalysis && latestAnalysis.suggestedReplies.length > 0 && onSelectReply && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-3 md:p-4 shadow-sm">
+                        <SelectableReplies
+                          replies={latestAnalysis.suggestedReplies}
+                          onSelect={onSelectReply}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* 非最后一条买家消息：如果已选择回复就显示，否则不显示 */}
+                {!isLastBuyerMessage && !isLastMessage && selectedReply && (
+                  <SelectedReplyCard reply={selectedReply} />
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
       {/* 待发送的消息（立即显示） */}
       {pendingMessage && (

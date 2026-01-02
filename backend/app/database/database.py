@@ -200,3 +200,22 @@ def init_db() -> None:
             cursor.execute("""
                 INSERT INTO retention_templates (content, is_default) VALUES (?, ?)
             """, ("虽然因为你的预算不够没成，但特别愿意帮你把把关～你可以给我链接下一个10r订单，我微信转你12r，你要写的东西我也可以帮你看看梳理一下，相当于你多2r+免费咨询。", 1))
+
+        # 要好评话术模板表
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS review_templates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                content TEXT NOT NULL,
+                is_default BOOLEAN DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # 检查是否需要插入默认要好评话术
+        cursor.execute("SELECT COUNT(*) FROM review_templates")
+        review_count = cursor.fetchone()[0]
+
+        if review_count == 0:
+            cursor.execute("""
+                INSERT INTO review_templates (content, is_default) VALUES (?, ?)
+            """, ("感谢您的信任和支持！🎉\n\n如果对这次服务满意的话，麻烦给个好评哦～\n您的好评是对我最大的鼓励 ❤️\n\n后续有需要随时找我，老客户优惠哦～✨", 1))

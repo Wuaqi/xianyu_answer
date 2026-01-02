@@ -1,31 +1,6 @@
-import type { AnalysisRequest, AnalysisResponse, ServiceType, LLMConfig, PromptTemplates } from '../types';
+import type { ServiceType, LLMConfig, PromptTemplates } from '../types';
 
 const API_BASE = '/api';
-
-export async function analyzeMessage(request: AnalysisRequest): Promise<AnalysisResponse> {
-  try {
-    const response = await fetch(`${API_BASE}/analyze`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(request),
-    });
-
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      const message = error.detail || `HTTP ${response.status}: ${response.statusText}`;
-      throw new Error(message);
-    }
-
-    return response.json();
-  } catch (err) {
-    if (err instanceof TypeError && err.message === 'Failed to fetch') {
-      throw new Error('无法连接到服务器，请检查后端服务是否启动');
-    }
-    throw err;
-  }
-}
 
 export async function getServices(): Promise<ServiceType[]> {
   const response = await fetch(`${API_BASE}/services`);

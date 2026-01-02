@@ -194,6 +194,40 @@ export async function updateRetentionTemplate(request: UpdateRetentionTemplateRe
   }
 }
 
+// ========== 要好评话术 ==========
+
+/**
+ * 获取默认要好评话术
+ */
+export async function getReviewTemplate(): Promise<RetentionTemplate> {
+  const response = await fetch(`${API_BASE}/review-template`);
+
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error('要好评话术不存在');
+    }
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || `获取要好评话术失败: HTTP ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * 更新默认要好评话术
+ */
+export async function updateReviewTemplate(request: UpdateRetentionTemplateRequest): Promise<void> {
+  const response = await fetch(`${API_BASE}/review-template`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || `更新要好评话术失败: HTTP ${response.status}`);
+  }
+}
 
 // ========== 消息分析 ==========
 

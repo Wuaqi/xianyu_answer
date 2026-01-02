@@ -3,9 +3,10 @@
  * 选择成交状态，记录成交信息或显示挽留话术
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { SessionDetail, SessionDealStatus, RequirementSummary, LLMConfig } from '../types';
 import { RequirementSummaryCard } from './RequirementSummaryCard';
+import { PriceCalculator } from './PriceCalculator';
 import { summarizeRequirements, getRetentionTemplate } from '../services/sessionApi';
 
 interface EndSessionModalProps {
@@ -43,6 +44,7 @@ export function EndSessionModal({
 }: EndSessionModalProps) {
   const [dealStatus, setDealStatus] = useState<SessionDealStatus>('pending');
   const [dealPrice, setDealPrice] = useState<string>('');
+  const [useCalculator, setUseCalculator] = useState(true);  // 默认使用计算器
   const [articleType, setArticleType] = useState<string>('');
   const [customType, setCustomType] = useState<string>('');
   const [requirementSummary, setRequirementSummary] = useState<RequirementSummary | null>(null);
@@ -50,6 +52,13 @@ export function EndSessionModal({
   const [retentionTemplate, setRetentionTemplate] = useState<string>('');
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // 当计算器价格变化时更新
+  const handlePriceChange = useCallback((price: number | null) => {
+    if (useCalculator && price !== null) {
+      setDealPrice(String(price));
+    }
+  }, [useCalculator]);
 
   // 当选择成交时，自动提炼需求要点
   useEffect(() => {
@@ -217,17 +226,59 @@ export function EndSessionModal({
             <div className="space-y-4">
               {/* 成交价格 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">成交价格</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
-                  <input
-                    type="number"
-                    value={dealPrice}
-                    onChange={(e) => setDealPrice(e.target.value)}
-                    placeholder="请输入成交价格"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                  />
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-sm font-medium text-gray-700">成交价格</label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUseCalculator(true)}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        useCalculator
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      计算器
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUseCalculator(false)}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        !useCalculator
+                          ? 'bg-blue-100 text-blue-700'
+                          : 'text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      手动输入
+                    </button>
+                  </div>
                 </div>
+
+                {useCalculator ? (
+                  <PriceCalculator
+                    extractedInfo={session.latestAnalysis?.extractedInfo}
+                    onPriceChange={handlePriceChange}
+                  />
+                ) : (
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
+                    <input
+                      type="number"
+                      value={dealPrice}
+                      onChange={(e) => setDealPrice(e.target.value)}
+                      placeholder="请输入成交价格"
+                      className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
+
+                {/* 手动输入时显示最终价格 */}
+                {!useCalculator && dealPrice && (
+                  <div className="mt-2 flex items-center justify-between bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+                    <span className="text-sm text-green-700">最终成交价格</span>
+                    <span className="text-xl font-bold text-green-700">¥{dealPrice}</span>
+                  </div>
+                )}
               </div>
 
               {/* 文章类型 */}

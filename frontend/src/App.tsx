@@ -1,19 +1,12 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { MessageInput } from './components/MessageInput';
-import { AnalysisResult } from './components/AnalysisResult';
-import { ReplySection } from './components/ReplySection';
-import { PriceEstimate } from './components/PriceEstimate';
 import { SettingsModal } from './components/SettingsModal';
-import { PriceListModal } from './components/PriceListModal';
 import { PromptModal } from './components/PromptModal';
 import { CombinedHistoryPage } from './components/CombinedHistoryPage';
-import { TemplatePanel } from './components/TemplatePanel';
 import { SessionPanel } from './components/SessionPanel';
+import { PriceListPage } from './components/PriceListPage';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { analyzeMessage } from './services/api';
-import { createHistory } from './services/historyApi';
-import type { LLMConfig, AnalysisResponse, TabType } from './types';
+import type { LLMConfig, TabType } from './types';
 import './index.css';
 
 const DEFAULT_CONFIG: LLMConfig = {
@@ -22,7 +15,7 @@ const DEFAULT_CONFIG: LLMConfig = {
   modelId: '',
 };
 
-// 侧边栏/底部导航项
+// 侧边栏/底部导航项（移除了快速分析）
 const NAV_ITEMS: { key: TabType; label: string; icon: ReactNode }[] = [
   {
     key: 'sessions',
@@ -34,11 +27,11 @@ const NAV_ITEMS: { key: TabType; label: string; icon: ReactNode }[] = [
     ),
   },
   {
-    key: 'analyze',
-    label: '分析',
+    key: 'pricing',
+    label: '报价',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
   },
@@ -78,59 +71,10 @@ const TOOL_ITEMS = [
 
 function App() {
   const [config, setConfig] = useLocalStorage<LLMConfig>('llm-config', DEFAULT_CONFIG);
-  const [message, setMessage] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [result, setResult] = useState<AnalysisResponse | null>(null);
-  const [editedReply, setEditedReply] = useState('');
-  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>('sessions');
   const [showSettings, setShowSettings] = useState(false);
-  const [showPriceList, setShowPriceList] = useState(false);
   const [showPromptModal, setShowPromptModal] = useState(false);
-  const [showTemplatePanel, setShowTemplatePanel] = useState(false);
   const [sessionIdToLoad, setSessionIdToLoad] = useState<number | undefined>(undefined);
-
-  const handleAnalyze = async () => {
-    if (!message.trim()) return;
-
-    if (!config.baseUrl || !config.apiKey || !config.modelId) {
-      setError('请先配置大模型API');
-      setShowSettings(true);
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const response = await analyzeMessage({
-        message: message.trim(),
-        llmConfig: config,
-      });
-      setResult(response);
-      setEditedReply(response.suggestedReply);
-
-      // 自动保存到历史记录
-      try {
-        await createHistory({
-          buyerMessage: message.trim(),
-          analysisResult: response,
-        });
-      } catch (err) {
-        console.error('保存历史记录失败:', err);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '分析失败');
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleInsertTemplate = (content: string) => {
-    setEditedReply((prev) => prev + '\n' + content);
-    setShowTemplatePanel(false);
-  };
 
   // 从历史记录查看会话
   const handleViewSession = (sessionId: number) => {
@@ -194,60 +138,9 @@ function App() {
             sessionIdToLoad={sessionIdToLoad}
             onSessionLoaded={handleSessionLoaded}
           />
-        ) : activeTab === 'analyze' ? (
-          <div className="flex-1 overflow-y-auto p-4 md:p-6">
-            <div className="max-w-3xl mx-auto space-y-4 md:space-y-6">
-              {/* Message Input */}
-              <section className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-                <MessageInput
-                  value={message}
-                  onChange={setMessage}
-                  onAnalyze={handleAnalyze}
-                  isAnalyzing={isAnalyzing}
-                />
-              </section>
-
-              {/* Error */}
-              {error && (
-                <div className="p-3 md:p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm md:text-base">
-                  {error}
-                </div>
-              )}
-
-              {/* Results */}
-              {result && (
-                <>
-                  {/* Analysis Result */}
-                  <section className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-                    <AnalysisResult result={result} />
-                  </section>
-
-                  {/* Suggested Reply */}
-                  <section className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-                    <ReplySection
-                      reply={editedReply}
-                      onReplyChange={setEditedReply}
-                      onOpenTemplates={() => setShowTemplatePanel(true)}
-                    />
-                  </section>
-
-                  {/* Price Estimate */}
-                  <section className="bg-white rounded-xl shadow-sm p-4 md:p-6">
-                    <PriceEstimate estimate={result.priceEstimate} />
-                  </section>
-                </>
-              )}
-
-              {/* Price List Link */}
-              <div className="text-center">
-                <button
-                  onClick={() => setShowPriceList(true)}
-                  className="text-blue-600 hover:text-blue-800 text-sm"
-                >
-                  查看完整价目表
-                </button>
-              </div>
-            </div>
+        ) : activeTab === 'pricing' ? (
+          <div className="flex-1 overflow-y-auto">
+            <PriceListPage />
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 md:p-6">
@@ -293,18 +186,9 @@ function App() {
         config={config}
         onSave={setConfig}
       />
-      <PriceListModal
-        isOpen={showPriceList}
-        onClose={() => setShowPriceList(false)}
-      />
       <PromptModal
         isOpen={showPromptModal}
         onClose={() => setShowPromptModal(false)}
-      />
-      <TemplatePanel
-        isOpen={showTemplatePanel}
-        onClose={() => setShowTemplatePanel(false)}
-        onInsert={handleInsertTemplate}
       />
     </div>
   );

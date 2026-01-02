@@ -1,26 +1,16 @@
 import { useState, useEffect } from 'react';
 import type { PromptTemplates } from '../types';
 import { getPrompts, updatePrompts } from '../services/api';
-import { getRetentionTemplate, updateRetentionTemplate } from '../services/sessionApi';
+import { getRetentionTemplate, updateRetentionTemplate, getReviewTemplate, updateReviewTemplate } from '../services/sessionApi';
 
 interface PromptModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type PromptTab = 'analyze' | 'system' | 'analyze_v3' | 'retention';
+type PromptTab = 'analyze_v3' | 'retention' | 'review';
 
 const TAB_CONFIG: { key: PromptTab; label: string; description: string }[] = [
-  {
-    key: 'analyze',
-    label: '快速分析',
-    description: '可用变量：{message}（买家消息）、{service_list}（服务列表）、{service_count}（服务数量）',
-  },
-  {
-    key: 'system',
-    label: '系统提示词',
-    description: '系统提示词用于设定 AI 的角色和行为规则',
-  },
   {
     key: 'analyze_v3',
     label: '对话分析',
@@ -31,16 +21,20 @@ const TAB_CONFIG: { key: PromptTab; label: string; description: string }[] = [
     label: '挽留话术',
     description: '当会话未成交时，用于挽留客户的话术模板',
   },
+  {
+    key: 'review',
+    label: '要好评',
+    description: '成交后发送给客户的好评请求话术模板',
+  },
 ];
 
 export function PromptModal({ isOpen, onClose }: PromptModalProps) {
-  const [prompts, setPrompts] = useState<PromptTemplates & { retention: string }>({
-    analyze: '',
-    system: '',
+  const [prompts, setPrompts] = useState<PromptTemplates>({
     analyze_v3: '',
     retention: '',
+    review: '',
   });
-  const [activeTab, setActiveTab] = useState<PromptTab>('analyze');
+  const [activeTab, setActiveTab] = useState<PromptTab>('analyze_v3');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -50,15 +44,17 @@ export function PromptModal({ isOpen, onClose }: PromptModalProps) {
       setLoading(true);
       setMessage(null);
 
-      // 并行加载提示词和挽留话术
+      // 并行加载提示词、挽留话术和要好评话术
       Promise.all([
         getPrompts(),
         getRetentionTemplate().catch(() => ({ content: '亲，看到您还没有下单，是有什么顾虑吗？我们可以再聊聊~' })),
+        getReviewTemplate().catch(() => ({ content: '感谢您的信任和支持！如果对这次服务满意的话，麻烦给个好评哦～' })),
       ])
-        .then(([promptsData, retentionData]) => {
+        .then(([promptsData, retentionData, reviewData]) => {
           setPrompts({
-            ...promptsData,
+            analyze_v3: promptsData.analyze_v3,
             retention: retentionData.content,
+            review: reviewData.content,
           });
         })
         .catch((err) => setMessage({ type: 'error', text: err.message }))
@@ -74,13 +70,14 @@ export function PromptModal({ isOpen, onClose }: PromptModalProps) {
     try {
       // 保存提示词
       await updatePrompts({
-        analyze: prompts.analyze,
-        system: prompts.system,
         analyze_v3: prompts.analyze_v3,
       });
 
       // 保存挽留话术
       await updateRetentionTemplate({ content: prompts.retention });
+
+      // 保存要好评话术
+      await updateReviewTemplate({ content: prompts.review });
 
       setMessage({ type: 'success', text: '保存成功' });
     } catch (err) {

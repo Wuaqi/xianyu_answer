@@ -75,13 +75,16 @@ def load_services() -> list[ServiceType]:
 
         # 确定计价单位
         unit = "thousand"  # 默认千字
+        name_lower = name.lower()
+        note_lower = note.lower() if note else ""
+
         if "按页" in name or "按页" in note:
             unit = "page"
         elif "按分钟" in name or "分钟计" in name:
             unit = "minute"
         elif "按篇" in name or "按篇" in note:
             unit = "piece"
-        elif "PPT" in name:
+        elif "ppt" in name_lower or "一页" in name:
             unit = "page"
         elif "看视频" in name:
             unit = "minute"

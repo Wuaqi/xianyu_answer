@@ -5,10 +5,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 from ..models.schemas import (
-    LLMConfig, AnalysisResponse, ExtractedInfo, PriceEstimate,
-    ExtractedInfoV3, PriceEstimateV3, Message, RequirementSummary
+    LLMConfig, ExtractedInfoV3, RequirementSummary
 )
-from ..prompts.analyze_prompt import build_analyze_prompt, get_system_prompt
 from ..data.services_loader import get_services
 
 logger = logging.getLogger(__name__)
@@ -24,10 +22,13 @@ async def call_llm(config: LLMConfig, prompt: str) -> str:
         "Content-Type": "application/json",
     }
 
+    # 简洁的系统提示词
+    system_prompt = "你是一个专业的闲鱼代写服务助手，帮助卖家专业地回复买家咨询。请严格按照要求的JSON格式返回结果。"
+
     payload = {
         "model": config.modelId,
         "messages": [
-            {"role": "system", "content": get_system_prompt()},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},
         ],
         "temperature": 0.7,
@@ -85,63 +86,6 @@ def parse_llm_response(response_text: str) -> dict:
             pass
 
     raise ValueError("无法解析 LLM 响应")
-
-
-async def analyze_message(message: str, config: LLMConfig) -> AnalysisResponse:
-    """分析买家消息"""
-    services = get_services()
-
-    # 构建 prompt
-    prompt = build_analyze_prompt(message, services)
-
-    # 调用 LLM
-    response_text = await call_llm(config, prompt)
-
-    # 解析响应
-    data = parse_llm_response(response_text)
-
-    # 构建响应对象
-    extracted_info = ExtractedInfo(
-        topic=data.get("extractedInfo", {}).get("topic"),
-        wordCount=data.get("extractedInfo", {}).get("wordCount"),
-        deadline=data.get("extractedInfo", {}).get("deadline"),
-        hasReference=data.get("extractedInfo", {}).get("hasReference"),
-        specialRequirements=data.get("extractedInfo", {}).get("specialRequirements"),
-    )
-
-    price_data = data.get("priceEstimate", {})
-    price_estimate = PriceEstimate(
-        min=price_data.get("min") or 0,
-        max=price_data.get("max") or 0,
-        basis=price_data.get("basis") or "",
-        canQuote=price_data.get("canQuote", False),
-    )
-
-    # 获取检测到的服务类型
-    detected_type = None
-    if data.get("detectedType"):
-        dt = data["detectedType"]
-        from ..models.schemas import ServiceType
-
-        detected_type = ServiceType(
-            id=dt.get("id", 0),
-            name=dt.get("name", ""),
-            priceSimple=dt.get("priceSimple"),
-            priceComplex=dt.get("priceComplex"),
-            unit=dt.get("unit", "thousand"),
-            requiresMaterial=dt.get("requiresMaterial", False),
-            note=dt.get("note", ""),
-        )
-
-    return AnalysisResponse(
-        detectedType=detected_type,
-        possibleTypes=[],
-        confidence=data.get("confidence", 0.0),
-        extractedInfo=extracted_info,
-        missingInfo=data.get("missingInfo", []),
-        suggestedReply=data.get("suggestedReply", ""),
-        priceEstimate=price_estimate,
-    )
 
 
 async def test_connection(config: LLMConfig) -> bool:

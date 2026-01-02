@@ -16,100 +16,11 @@ export interface ServiceType {
   note: string;
 }
 
-// 分析请求
-export interface AnalysisRequest {
-  message: string;
-  llmConfig: LLMConfig;
-}
-
-// 提取的信息
-export interface ExtractedInfo {
-  topic?: string;
-  wordCount?: number;
-  deadline?: string;
-  hasReference?: boolean;
-  specialRequirements?: string[];
-}
-
-// 报价信息
-export interface PriceEstimate {
-  min: number;
-  max: number;
-  basis: string;
-  canQuote: boolean;
-}
-
-// 分析响应
-export interface AnalysisResponse {
-  detectedType: ServiceType | null;
-  possibleTypes: ServiceType[];
-  confidence: number;
-  extractedInfo: ExtractedInfo;
-  missingInfo: string[];
-  suggestedReply: string;
-  priceEstimate: PriceEstimate;
-}
-
-// 应用状态
-export interface AppState {
-  message: string;
-  isAnalyzing: boolean;
-  result: AnalysisResponse | null;
-  error: string | null;
-}
-
-// 提示词模板
+// 提示词模板（V4.1 精简版）
 export interface PromptTemplates {
-  analyze: string;
-  system: string;
-  analyze_v3: string;
-}
-
-// ========== 历史记录类型 ==========
-
-export type DealStatus = 'pending' | 'closed' | 'failed';
-
-export interface HistoryRecord {
-  id: number;
-  buyerMessage: string;
-  detectedTypeName: string | null;
-  confidence: number;
-  extractedInfo: ExtractedInfo;
-  missingInfo: string[];
-  suggestedReply: string;
-  priceMin: number;
-  priceMax: number;
-  priceBasis: string;
-  articleType: string | null;
-  dealStatus: DealStatus;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface HistoryListResponse {
-  items: HistoryRecord[];
-  total: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-export interface HistoryFilter {
-  search: string;
-  articleType: string;
-  dealStatus: string;
-  startDate: string;
-  endDate: string;
-}
-
-export interface CreateHistoryRequest {
-  buyerMessage: string;
-  analysisResult: AnalysisResponse;
-}
-
-export interface UpdateHistoryRequest {
-  articleType?: string;
-  dealStatus?: DealStatus;
+  analyze_v3: string;     // 对话分析提示词
+  retention: string;      // 挽留话术
+  review: string;         // 要好评话术
 }
 
 // ========== 回复模板类型 ==========
@@ -136,9 +47,9 @@ export interface UpdateTemplateRequest {
   content: string;
 }
 
-// ========== 标签页类型 ==========
+// ========== 标签页类型（移除了 analyze）==========
 
-export type TabType = 'analyze' | 'sessions' | 'history';
+export type TabType = 'sessions' | 'history' | 'pricing';
 
 
 // ========== V3 会话类型 ==========

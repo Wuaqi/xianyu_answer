@@ -3,11 +3,13 @@
  * V3 对话式助手的核心交互界面
  */
 
-import { useState, useEffect } from 'react';
-import type { LLMConfig, AIAnalysis, SessionDealStatus } from '../types';
-import { ConversationView } from './ConversationView';
-import { SuggestedReplies } from './SuggestedReplies';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { LLMConfig, AIAnalysis, SessionDealStatus, RequirementSummary } from '../types';
+import { ConversationView, MissingInfoAlert } from './ConversationView';
 import { EndSessionModal } from './EndSessionModal';
+import { ArticlePriceCard } from './ArticlePriceCard';
+import { RequirementSummaryCard } from './RequirementSummaryCard';
+import { FileUpload, FilePreview } from './FileUpload';
 import { useCurrentSession } from '../hooks/useSession';
 import { analyzeMessage } from '../services/sessionApi';
 
@@ -36,6 +38,8 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [failedMessage, setFailedMessage] = useState<string | null>(null); // 保存失败的消息用于重试
   const [showRepliesModal, setShowRepliesModal] = useState(false);
+  const [attachedFile, setAttachedFile] = useState<{ file: File; content: string } | null>(null);
+  const [selectedReplies, setSelectedReplies] = useState<Record<number, string>>({});  // 每轮对话选中的回复
 
   // 解析错误信息，返回友好提示
   const getErrorHint = (error: string): { message: string; hint: string } => {
@@ -145,10 +149,38 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
     }
   }, [session]);
 
+  // 解析需求要点（从 JSON 字符串或对象）
+  const parsedRequirementSummary = useMemo((): RequirementSummary | null => {
+    if (!session?.requirementSummary) return null;
+
+    // 如果已经是对象，直接返回
+    if (typeof session.requirementSummary === 'object') {
+      return session.requirementSummary as RequirementSummary;
+    }
+
+    // 尝试解析 JSON 字符串
+    try {
+      return JSON.parse(session.requirementSummary);
+    } catch {
+      return null;
+    }
+  }, [session?.requirementSummary]);
+
   // 发送消息并分析
   const handleSendMessage = async (messageContent?: string) => {
     // 如果传入的是事件对象（点击按钮时），使用 inputValue
-    const content = (typeof messageContent === 'string' ? messageContent : inputValue).trim();
+    let content = (typeof messageContent === 'string' ? messageContent : inputValue).trim();
+
+    // 如果有附加的文本文件，将内容追加到消息中
+    if (attachedFile && !attachedFile.file.type.startsWith('image/')) {
+      const fileContent = attachedFile.content;
+      if (content) {
+        content = `${content}\n\n---\n【附件内容：${attachedFile.file.name}】\n${fileContent}`;
+      } else {
+        content = `【附件内容：${attachedFile.file.name}】\n${fileContent}`;
+      }
+    }
+
     if (!content) return;
 
     // 检查 LLM 配置
@@ -163,6 +195,7 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
     setInputValue('');
     setAnalyzeError(null);
     setFailedMessage(null);
+    setAttachedFile(null); // 清除附件
 
     try {
       let currentSessionId = session?.id;
@@ -238,6 +271,19 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
     }
   };
 
+  // 选择回复的回调
+  const handleSelectReply = useCallback((reply: string) => {
+    // 找到最后一条买家消息的 ID
+    const messages = session?.messages || [];
+    const lastBuyerMessage = [...messages].reverse().find(m => m.message.role === 'buyer');
+    if (lastBuyerMessage) {
+      setSelectedReplies(prev => ({
+        ...prev,
+        [lastBuyerMessage.message.id]: reply
+      }));
+    }
+  }, [session?.messages]);
+
   // 格式化会话标题
   const getSessionTitle = () => {
     if (!session) return '新对话';
@@ -258,9 +304,6 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
     // 回退到会话编号
     return `会话 #${session.id}`;
   };
-
-  // 推荐回复数量
-  const repliesCount = latestAnalysis?.suggestedReplies?.length || 0;
 
   return (
     <div className="flex flex-col h-full relative">
@@ -333,33 +376,87 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
             messages={session?.messages || []}
             isLoading={isAnalyzing}
             pendingMessage={pendingMessage}
+            latestAnalysis={latestAnalysis}
+            sessionStatus={session?.status || 'active'}
+            onSelectReply={handleSelectReply}
+            selectedReplies={selectedReplies}
           />
         </div>
 
-        {/* 右侧：推荐回复和状态信息（仅桌面端显示） */}
-        <div className="hidden md:flex md:w-96 flex-col bg-gray-50 overflow-y-auto">
+        {/* 右侧：仍需了解和报价信息（仅桌面端显示） */}
+        <div className="hidden md:flex md:w-80 flex-col bg-gray-50 overflow-y-auto">
           <div className="p-4 space-y-4">
-            {/* 推荐回复 */}
-            {latestAnalysis && latestAnalysis.suggestedReplies.length > 0 && (
-              <SuggestedReplies
-                replies={latestAnalysis.suggestedReplies}
-              />
+            {/* 会话进行中：显示仍需了解和文章单价 */}
+            {session?.status === 'active' && (
+              <>
+                {/* 仍需了解 */}
+                {latestAnalysis && latestAnalysis.missingInfo.length > 0 && (
+                  <MissingInfoAlert items={latestAnalysis.missingInfo} />
+                )}
+
+                {/* 文章类型单价参考（替换原来的 PriceControl） */}
+                {latestAnalysis?.extractedInfo && (
+                  <ArticlePriceCard extractedInfo={latestAnalysis.extractedInfo} />
+                )}
+              </>
             )}
 
-            {/* 报价信息 */}
-            {latestAnalysis?.canQuote && latestAnalysis.priceEstimate && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-green-800 mb-2">
-                  建议报价
+            {/* 会话已成交：显示需求要点 */}
+            {session?.status === 'closed' && session.dealStatus === 'success' && parsedRequirementSummary && (
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  需求要点
                 </h4>
-                <div className="text-2xl font-bold text-green-700">
-                  ¥{latestAnalysis.priceEstimate.min} - ¥{latestAnalysis.priceEstimate.max}
+                <RequirementSummaryCard summary={parsedRequirementSummary} />
+              </div>
+            )}
+
+            {/* 会话已成交但无需求要点时显示成交信息 */}
+            {session?.status === 'closed' && session.dealStatus === 'success' && !parsedRequirementSummary && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-green-700">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="font-medium">已成交</span>
                 </div>
-                {latestAnalysis.priceEstimate.basis && (
-                  <p className="mt-2 text-sm text-green-600">
-                    {latestAnalysis.priceEstimate.basis}
-                  </p>
+                {session.dealPrice && (
+                  <div className="mt-2 text-2xl font-bold text-green-700">
+                    ¥{session.dealPrice}
+                  </div>
                 )}
+                {session.articleType && (
+                  <div className="mt-1 text-sm text-green-600">
+                    {session.articleType}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* 会话未成交或待定 */}
+            {session?.status === 'closed' && session.dealStatus !== 'success' && (
+              <div className={`border rounded-lg p-4 ${
+                session.dealStatus === 'failed'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-yellow-50 border-yellow-200'
+              }`}>
+                <div className={`flex items-center gap-2 ${
+                  session.dealStatus === 'failed' ? 'text-red-700' : 'text-yellow-700'
+                }`}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    {session.dealStatus === 'failed' ? (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    ) : (
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    )}
+                  </svg>
+                  <span className="font-medium">
+                    {session.dealStatus === 'failed' ? '未成交' : '待定'}
+                  </span>
+                </div>
               </div>
             )}
 
@@ -398,14 +495,15 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
               </div>
             )}
 
-            {/* 空状态 */}
-            {!latestAnalysis && !isAnalyzing && !analyzeError && (
+            {/* 空状态 - 仅在会话进行中显示 */}
+            {session?.status === 'active' && !latestAnalysis && !isAnalyzing && !analyzeError && (
               <div className="text-center text-gray-400 py-8">
                 <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5}
                         d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
-                <p>输入买家消息后，AI将生成回复建议</p>
+                <p className="text-sm">输入买家消息后</p>
+                <p className="text-sm">这里会显示待了解信息</p>
               </div>
             )}
           </div>
@@ -427,23 +525,39 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
           </div>
         ) : (
           <>
-            {/* 移动端：查看推荐回复按钮 */}
-            {repliesCount > 0 && (
+            {/* 移动端：查看详情按钮 - 仅在会话进行中显示 */}
+            {session?.status === 'active' && latestAnalysis && (latestAnalysis.missingInfo.length > 0 || latestAnalysis.extractedInfo) && (
               <div className="flex justify-end mb-2">
                 <button
                   onClick={() => setShowRepliesModal(true)}
-                  className="md:hidden px-3 py-1.5 bg-blue-500 text-white text-xs rounded-full flex items-center gap-1"
+                  className="md:hidden px-3 py-1.5 bg-amber-500 text-white text-xs rounded-full flex items-center gap-1"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  查看回复 ({repliesCount})
+                  查看详情
                 </button>
               </div>
             )}
 
+            {/* 附件预览 */}
+            {attachedFile && (
+              <div className="mb-2">
+                <FilePreview
+                  file={attachedFile.file}
+                  content={attachedFile.content}
+                  onRemove={() => setAttachedFile(null)}
+                />
+              </div>
+            )}
+
             {/* 输入框 */}
-            <div className="flex gap-2 md:gap-3">
+            <div className="flex gap-2 md:gap-3 items-end">
+              {/* 文件上传按钮 */}
+              <FileUpload
+                onFileSelect={(file, content) => setAttachedFile({ file, content })}
+                disabled={isAnalyzing}
+              />
               <textarea
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
@@ -455,8 +569,8 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
               />
               <button
                 onClick={() => handleSendMessage()}
-                disabled={!inputValue.trim() || isAnalyzing || !llmConfig}
-                className="px-4 md:px-6 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm md:text-base"
+                disabled={(!inputValue.trim() && !attachedFile) || isAnalyzing || !llmConfig}
+                className="px-4 md:px-6 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm md:text-base self-stretch"
               >
                 {isAnalyzing ? (
                   <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -526,12 +640,12 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
         </div>
       )}
 
-      {/* 移动端推荐回复弹窗 */}
+      {/* 移动端信息详情弹窗 */}
       {showRepliesModal && (
         <div className="md:hidden fixed inset-0 z-50 bg-gray-100">
           {/* 弹窗头部 */}
           <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-800">推荐回复</h3>
+            <h3 className="text-lg font-medium text-gray-800">分析详情</h3>
             <button
               onClick={() => setShowRepliesModal(false)}
               className="p-2 -mr-2 text-gray-500 hover:text-gray-700"
@@ -544,27 +658,20 @@ export function SessionPanel({ llmConfig, onOpenSettings, sessionIdToLoad, onSes
 
           {/* 弹窗内容 */}
           <div className="flex-1 overflow-y-auto p-4 pb-20 space-y-4">
-            {/* 推荐回复列表 */}
-            {latestAnalysis && latestAnalysis.suggestedReplies.length > 0 && (
-              <SuggestedReplies
-                replies={latestAnalysis.suggestedReplies}
-              />
+            {/* 仍需了解 */}
+            {latestAnalysis && latestAnalysis.missingInfo.length > 0 && (
+              <MissingInfoAlert items={latestAnalysis.missingInfo} />
             )}
 
-            {/* 报价信息 */}
-            {latestAnalysis?.canQuote && latestAnalysis.priceEstimate && (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <h4 className="text-sm font-medium text-green-800 mb-2">
-                  建议报价
-                </h4>
-                <div className="text-2xl font-bold text-green-700">
-                  ¥{latestAnalysis.priceEstimate.min} - ¥{latestAnalysis.priceEstimate.max}
-                </div>
-                {latestAnalysis.priceEstimate.basis && (
-                  <p className="mt-2 text-sm text-green-600">
-                    {latestAnalysis.priceEstimate.basis}
-                  </p>
-                )}
+            {/* 文章类型单价参考 */}
+            {latestAnalysis?.extractedInfo && (
+              <ArticlePriceCard extractedInfo={latestAnalysis.extractedInfo} />
+            )}
+
+            {/* 没有信息时的空状态 */}
+            {latestAnalysis && latestAnalysis.missingInfo.length === 0 && !latestAnalysis.extractedInfo && (
+              <div className="text-center text-gray-400 py-8">
+                <p className="text-sm">暂无待了解的信息</p>
               </div>
             )}
           </div>

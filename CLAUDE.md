@@ -242,6 +242,8 @@ xianyu_answer/
 | Python 项目添加失败 | 改用进程守护管理器 |
 | 虚拟环境无 python | 使用 python3 代替 |
 | GitHub 克隆失败 | 使用镜像 ghproxy.com |
+| 端口 8000 被占用 | 执行 `lsof -ti:8000 \| xargs kill -9` 后重启 |
+| 重启后立即停止 | 先停止进程，清理端口，再启动 |
 
 ## 版本历史
 

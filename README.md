@@ -219,48 +219,19 @@ npm install && npm run build
 
 ### 项目更新
 
-**方式一：一键部署脚本（推荐）**
+**一键部署脚本（推荐）**
 ```bash
 cd /Users/wyq/Developer/xianyu_answer
 ./deploy.sh
 # 完成后在宝塔面板「进程守护管理器」重启 xianyu_answer
 ```
 
-**方式二：手动打包上传**
-
-本地打包并上传：
+**配置 SSH 免密登录（可选）**
 ```bash
-cd /Users/wyq/Developer/xianyu_answer
-tar --exclude='node_modules' --exclude='.git' --exclude='backend/data/xianyu.db' --exclude='backend/venv' -czvf ../xianyu_answer.tar.gz .
-scp ../xianyu_answer.tar.gz root@111.231.107.149:/www/wwwroot/
+# 上传公钥到服务器（需输入一次密码）
+ssh-copy-id -i ~/.ssh/id_ed25519.pub root@111.231.107.149
+# 配置后运行 deploy.sh 无需输入密码
 ```
-
-服务器部署：
-```bash
-cd /www/wwwroot
-
-# 备份数据库和虚拟环境
-cp xianyu_answer/backend/data/xianyu.db ~/xianyu.db.backup
-mv xianyu_answer/backend/venv ~/venv.backup
-
-# 解压新代码
-rm -rf xianyu_answer && mkdir xianyu_answer
-tar -xzvf xianyu_answer.tar.gz -C xianyu_answer
-
-# 恢复数据库和虚拟环境
-cp ~/xianyu.db.backup xianyu_answer/backend/data/xianyu.db
-mv ~/venv.backup xianyu_answer/backend/venv
-
-# 构建前端
-cd xianyu_answer/frontend
-rm -rf dist && npm install && npm run build
-
-# 清理并重启
-rm /www/wwwroot/xianyu_answer.tar.gz
-# 宝塔面板「进程守护管理器」重启 xianyu_answer
-```
-
-> 如果 `requirements.txt` 有新增依赖，需额外执行：`cd /www/wwwroot/xianyu_answer/backend && ./venv/bin/pip install -r requirements.txt`
 
 ### 详细文档
 

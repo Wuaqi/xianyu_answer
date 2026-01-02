@@ -71,6 +71,12 @@ ENDSSH
 
 echo -e "${GREEN}✓ 部署完成${NC}"
 echo ""
+
+# 删除本地压缩包
+rm -f /Users/wyq/Developer/xianyu_answer.tar.gz
+echo -e "${GREEN}✓ 本地压缩包已清理${NC}"
+
+echo ""
 echo "=========================================="
 echo -e "${GREEN}  部署成功！${NC}"
 echo "=========================================="

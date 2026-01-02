@@ -219,10 +219,31 @@ npm install && npm run build
 
 ### 项目更新
 
+**方式一：Git 拉取**
 ```bash
 cd /www/wwwroot/xianyu_answer
 git pull origin main
 cd frontend && npm install && npm run build
+# 宝塔面板「进程守护管理器」重启项目
+```
+
+**方式二：手动打包上传（推荐，适合国内服务器）**
+
+本地打包：
+```bash
+cd /Users/wyq/Developer/xianyu_answer
+tar --exclude='node_modules' --exclude='.git' --exclude='backend/data/xianyu.db' -czvf ../xianyu_answer.tar.gz .
+scp ../xianyu_answer.tar.gz root@111.231.107.149:/www/wwwroot/
+```
+
+服务器部署：
+```bash
+cd /www/wwwroot
+cp xianyu_answer/backend/data/xianyu.db ~/xianyu.db.backup  # 备份数据库
+rm -rf xianyu_answer && mkdir xianyu_answer
+tar -xzvf xianyu_answer.tar.gz -C xianyu_answer
+cp ~/xianyu.db.backup xianyu_answer/backend/data/xianyu.db  # 恢复数据库
+cd xianyu_answer/frontend && npm install && npm run build
 # 宝塔面板「进程守护管理器」重启项目
 ```
 

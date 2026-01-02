@@ -825,7 +825,7 @@ server {
 
 当本地开发完成新功能并推送到 GitHub 后，在服务器执行以下步骤更新：
 
-#### 8.6.1 手动更新
+#### 8.6.1 方式一：Git 拉取（需要网络通畅）
 
 ```bash
 # SSH 登录服务器
@@ -834,24 +834,68 @@ ssh root@111.231.107.149
 # 进入项目目录
 cd /www/wwwroot/xianyu_answer
 
-# 1. 拉取最新代码
+# 执行更新脚本
+./update.sh
+
+# 或手动执行
 git pull origin main
+cd frontend && npm install && npm run build
+```
 
-# 2. 更新后端依赖（如有新增）
-cd backend
-/root/miniconda3/envs/xianyu/bin/pip install -r requirements.txt
+> 如果 GitHub 访问慢，可使用镜像：`git clone https://ghproxy.com/https://github.com/Wuaqi/xianyu_answer.git`
 
-# 3. 重新构建前端（如有改动）
-cd ../frontend
+#### 8.6.2 方式二：手动打包上传（推荐，适合国内服务器）
+
+**步骤 1：本地打包**
+
+```bash
+# 进入项目目录
+cd /Users/wyq/Developer/xianyu_answer
+
+# 打包项目（排除 node_modules、.git、数据库）
+tar --exclude='node_modules' --exclude='.git' --exclude='backend/data/xianyu.db' --exclude='__pycache__' --exclude='.DS_Store' -czvf ../xianyu_answer.tar.gz .
+```
+
+**步骤 2：上传到服务器**
+
+```bash
+# 上传压缩包
+scp /Users/wyq/Developer/xianyu_answer.tar.gz root@111.231.107.149:/www/wwwroot/
+```
+
+**步骤 3：服务器部署**
+
+```bash
+# SSH 登录服务器
+ssh root@111.231.107.149
+
+cd /www/wwwroot
+
+# 备份数据库（重要！）
+cp xianyu_answer/backend/data/xianyu.db ~/xianyu.db.backup
+
+# 删除旧目录，解压新文件
+rm -rf xianyu_answer
+mkdir xianyu_answer
+tar -xzvf xianyu_answer.tar.gz -C xianyu_answer
+
+# 恢复数据库
+cp ~/xianyu.db.backup /www/wwwroot/xianyu_answer/backend/data/xianyu.db
+
+# 安装依赖并构建前端
+cd xianyu_answer/frontend
 npm install
 npm run build
 
-# 4. 重启后端服务
-# 方式一：宝塔面板 → Python项目管理器 → 找到项目 → 点击「重启」
-# 方式二：命令行（如果知道进程管理方式）
+# 清理压缩包
+rm /www/wwwroot/xianyu_answer.tar.gz
 ```
 
-#### 8.6.2 一键更新脚本
+**步骤 4：重启服务**
+
+在宝塔面板「进程守护管理器」重启 `xianyu_answer` 项目。
+
+#### 8.6.3 一键更新脚本
 
 在服务器创建更新脚本，简化更新流程：
 
